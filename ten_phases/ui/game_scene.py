@@ -15,6 +15,7 @@ import pygame
 from ..ai import AIPlayer, plan_phase
 from ..cards import Card
 from ..game import Game, Player, RuleError
+from ..names import pick_ai_names
 from ..phases import NUM_PHASES, PHASES, GroupType, arrange_run, describe_phase
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
@@ -23,7 +24,6 @@ from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
 
 HUMAN = 0
-AI_NAMES = ["ZACH", "RACHEL", "RYAN", "MAYA", "OTTO"]
 DIFF_COLORS = {"Easy": theme.SUCCESS, "Medium": theme.INFO, "Hard": theme.ORANGE, "Expert": theme.DANGER}
 
 # Layout
@@ -91,7 +91,8 @@ class GameScene(Scene):
         else:
             diffs = s.opponent_difficulties()
             players = [Player("YOU", is_human=True)]
-            players += [Player(AI_NAMES[i], difficulty=d) for i, d in enumerate(diffs)]
+            names = pick_ai_names(len(diffs), taken=["YOU", s.player_name])
+            players += [Player(name, difficulty=d) for name, d in zip(names, diffs)]
             self.game = Game(players)
             self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
         self.hint_ai = AIPlayer("Expert", random.Random(0))

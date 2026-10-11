@@ -14,12 +14,12 @@ import threading
 from .. import __version__
 from ..ai import AIPlayer
 from ..game import Game, Player, RuleError
+from ..names import AI_NAMES
 from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
     local_ips, new_room_key
 from .snapshot import events_for, snapshot_for, unrotate
 
-AI_NAMES = ["ZACH", "RACHEL", "RYAN", "MAYA", "OTTO", "LUNA", "FINN", "IVY", "REX", "JUNO", "KAI"]
 
 
 class HostServer:
@@ -33,6 +33,8 @@ class HostServer:
         self.in_game = False
         self.session: HostSession | None = None
         self.notices: list[str] = []
+        # Shuffled once per lobby so the computer names stay put while you set things up.
+        self._ai_pool = random.sample(AI_NAMES, len(AI_NAMES))
         self.ips = local_ips()
         self.ip_index = 0
         self.custom_ip: str | None = None
@@ -108,7 +110,7 @@ class HostServer:
     def _ai_names(self) -> list[str]:
         """Computer names that don't clash with anyone at the table."""
         taken = {self.name} | {g.tag for g in self.guests}
-        return [n for n in AI_NAMES if n not in taken][:self.ai_count]
+        return [n for n in self._ai_pool if n not in taken][:self.ai_count]
 
     def _ai_level(self, k: int) -> str:
         if self.ai_level != "Mixed":
@@ -202,6 +204,7 @@ class HostServer:
         return self.session
 
     def back_to_lobby(self):
+        self._ai_pool = random.sample(AI_NAMES, len(AI_NAMES))  # new computer opponents for the rematch
         self.in_game = False
         self.session = None
         for g in self.guests:

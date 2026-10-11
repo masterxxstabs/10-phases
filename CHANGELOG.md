@@ -4,6 +4,10 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.2.1
+
+- Computer players now get random names from a pool of 70, so every game has a different cast
+
 ## 1.2.0
 
 - Hover over any player to see their phase, cards on the table, chips and recent moves
