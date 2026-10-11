@@ -44,15 +44,20 @@ class MenuScene(Scene):
         super().__init__(app)
         cx = theme.WIDTH // 2
         self.buttons = [
-            Button((cx - 150, 424, 300, 60), "PLAY", self._play, size=30, **PRIMARY),
-            Button((cx - 150, 496, 300, 48), "SETTINGS", lambda: app.go(SettingsScene(app))),
-            Button((cx - 150, 554, 300, 48), "CUSTOMIZE", self._customize),
-            Button((cx - 150, 612, 300, 48), "HOW TO PLAY", lambda: app.go(HowToScene(app))),
-            Button((cx - 150, 670, 300, 48), "QUIT", app.quit),
+            Button((cx - 150, 410, 300, 58), "PLAY", self._play, size=30, **PRIMARY),
+            Button((cx - 150, 476, 300, 48), "MULTIPLAYER", self._multiplayer),
+            Button((cx - 150, 530, 300, 46), "SETTINGS", lambda: app.go(SettingsScene(app))),
+            Button((cx - 150, 582, 300, 46), "CUSTOMIZE", self._customize),
+            Button((cx - 150, 634, 300, 46), "HOW TO PLAY", lambda: app.go(HowToScene(app))),
+            Button((cx - 150, 686, 300, 46), "QUIT", app.quit),
         ]
         rng = random.Random()
         deck = [number(c, v) for c in COLORS for v in range(1, 13)] + [wild(), wild(), skip()]
         self.fan = rng.sample(deck, 7)
+
+    def _multiplayer(self):
+        from .multiplayer import MultiplayerScene
+        self.app.go(MultiplayerScene(self.app))
 
     def _customize(self):
         from .customize import CustomizeScene
@@ -78,7 +83,7 @@ class MenuScene(Scene):
             img, _ = card_with_shadow(card, 100, 150)
             img = pygame.transform.rotozoom(img, -angle, 1)
             x = cx + (i - (n - 1) / 2) * 62
-            y = 288 + abs(i - (n - 1) / 2) ** 2 * 5
+            y = 276 + abs(i - (n - 1) / 2) ** 2 * 5
             surf.blit(img, img.get_rect(center=(x, y)))
         theme.logo(surf, "10 PHASES", (cx, 120), 92, angle=6)
         s = self.app.settings

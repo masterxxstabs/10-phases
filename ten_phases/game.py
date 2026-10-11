@@ -72,7 +72,8 @@ class Game:
         self.rng = rng or random.Random()
         self.dealer = self.rng.randrange(len(players))
         self.round = 0
-        self.events: list[Event] = []
+        self.events: list[Event] = []    # not yet shown by the UI
+        self.history: list[Event] = []   # everything, for network play
         self.game_over = False
         self.winner: int | None = None
         self.pot = 0
@@ -113,9 +114,9 @@ class Game:
         self.turn_number = 0
         if self.discard_pile[-1].is_skip:
             # A skip turned up as the first discard skips the first player.
-            self.events.append(Event("skipped", player=self.current))
+            self._emit(Event("skipped", player=self.current))
             self.current = self._next_index(self.current)
-        self.events.append(Event("round_start"))
+        self._emit(Event("round_start"))
 
     # ------------------------------------------------------------------ helpers
 
@@ -164,7 +165,7 @@ class Game:
         card = self.deck.draw()
         self.player.hand.append(card)
         self.has_drawn = True
-        self.events.append(Event("draw", player=player_index, card=card, source="deck"))
+        self._emit(Event("draw", player=player_index, card=card, source="deck"))
         return card
 
     def draw_from_discard(self, player_index: int) -> Card:
@@ -180,7 +181,7 @@ class Game:
         self.player.hand.append(top)
         self.has_drawn = True
         self.picked_from_discard[player_index].append(top)
-        self.events.append(Event("draw", player=player_index, card=top, source="discard"))
+        self._emit(Event("draw", player=player_index, card=top, source="discard"))
         return top
 
     def _reshuffle(self) -> None:
@@ -189,7 +190,7 @@ class Game:
             raise RuleError("No cards left to draw.")
         self.deck.refill(self.discard_pile)
         self.discard_pile = [top]
-        self.events.append(Event("reshuffle"))
+        self._emit(Event("reshuffle"))
 
     def lay_down(self, player_index: int, groups: list[list[Card]]) -> list[Meld]:
         """Lay down the current phase as explicit groups."""
@@ -216,7 +217,7 @@ class Game:
             p.hand.remove(c)
         p.laid_down = True
         p.completed_this_round = True
-        self.events.append(Event("lay", player=player_index))
+        self._emit(Event("lay", player=player_index))
         self._check_out(player_index)
         return new
 
@@ -249,7 +250,7 @@ class Game:
             raise RuleError(f"{card.label()} doesn't fit that group.")
         p.hand.remove(card)
         meld.cards.append(card)
-        self.events.append(Event("hit", player=player_index, card=card, meld=meld_id))
+        self._emit(Event("hit", player=player_index, card=card, meld=meld_id))
         self._check_out(player_index)
 
     def discard(self, player_index: int, card: Card, skip_target: int | None = None) -> None:
@@ -264,10 +265,10 @@ class Game:
                 raise RuleError("Choose another player to skip.")
         p.hand.remove(card)
         self.discard_pile.append(card)
-        self.events.append(Event("discard", player=player_index, card=card))
+        self._emit(Event("discard", player=player_index, card=card))
         if card.is_skip:
             self.players[skip_target].skips_pending += 1
-            self.events.append(Event("skip", player=player_index, target=skip_target))
+            self._emit(Event("skip", player=player_index, target=skip_target))
         if not self._check_out(player_index):
             self._advance()
 
@@ -285,12 +286,12 @@ class Game:
             target = self.players[nxt]
             if target.skips_pending > 0:
                 target.skips_pending -= 1
-                self.events.append(Event("skipped", player=nxt))
+                self._emit(Event("skipped", player=nxt))
                 nxt = self._next_index(nxt)
                 continue
             break
         self.current = nxt
-        self.events.append(Event("turn", player=nxt))
+        self._emit(Event("turn", player=nxt))
 
     def _check_out(self, player_index: int) -> bool:
         if self.players[player_index].hand:
@@ -310,12 +311,12 @@ class Game:
         winnings, self.pot = self.pot, 0
         self.players[went_out].chips += winnings
         self.round_chips[went_out] = self.round_chips.get(went_out, 0) + winnings
-        self.events.append(Event("round_end", player=went_out))
+        self._emit(Event("round_end", player=went_out))
         finished = [i for i, p in enumerate(self.players) if p.finished_all]
         if finished:
             self.game_over = True
             self.winner = min(finished, key=lambda i: (self.players[i].score, -self.players[i].chips))
-            self.events.append(Event("game_over", player=self.winner))
+            self._emit(Event("game_over", player=self.winner))
 
     def next_round(self) -> None:
         if not self.round_over or self.game_over:
@@ -326,6 +327,10 @@ class Game:
         """Player indices from best to worst: highest phase, then lowest score, then most chips."""
         return sorted(range(len(self.players)),
                       key=lambda i: (-self.players[i].phase, self.players[i].score, -self.players[i].chips))
+
+    def _emit(self, event: Event) -> None:
+        self.events.append(event)
+        self.history.append(event)
 
     def pop_events(self) -> list[Event]:
         ev, self.events = self.events, []

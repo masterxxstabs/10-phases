@@ -24,6 +24,7 @@ class Settings:
     hints: bool = True
     sort_by: str = "number"
     sfx: str = "Medium"
+    player_name: str = "PLAYER"
     # Look
     table_color: str = DEFAULT_TABLE
     accent: str = "Yellow"

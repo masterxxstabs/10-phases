@@ -75,14 +75,25 @@ class FlyingCard:
 
 
 class GameScene(Scene):
-    def __init__(self, app):
+    """The table. Plays a local game by default; pass `host` + `session` to host a network game,
+    or `client` to play in someone else's (the client's game mirror stands in for the engine)."""
+
+    def __init__(self, app, host=None, session=None, client=None):
         super().__init__(app)
         s = app.settings
-        diffs = s.opponent_difficulties()
-        players = [Player("YOU", is_human=True)]
-        players += [Player(AI_NAMES[i], difficulty=d) for i, d in enumerate(diffs)]
-        self.game = Game(players)
-        self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
+        self.host, self.session, self.client = host, session, client
+        if session is not None:
+            self.game = session.game
+            self.ais = session.ais
+        elif client is not None:
+            self.game = client.game
+            self.ais = {}
+        else:
+            diffs = s.opponent_difficulties()
+            players = [Player("YOU", is_human=True)]
+            players += [Player(AI_NAMES[i], difficulty=d) for i, d in enumerate(diffs)]
+            self.game = Game(players)
+            self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
         self.hint_ai = AIPlayer("Expert", random.Random(0))
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -110,10 +121,24 @@ class GameScene(Scene):
         self.buttons = [self.btn_lay, self.btn_discard, self.btn_sort, self.btn_hint, self.btn_menu]
         self.overlay_buttons: list[Button] = []
 
+        self._round_seen = self.game.round
         self._consume_events()
         self._round_splash()
 
     # ================================================================== helpers
+
+    @property
+    def networked(self) -> bool:
+        return self.host is not None or self.client is not None
+
+    def display_name(self, i: int) -> str:
+        return "YOU" if i == HUMAN else self.game.players[i].name
+
+    def role_chip(self, i: int) -> tuple[str, object]:
+        p = self.game.players[i]
+        if p.difficulty:
+            return p.difficulty.upper(), DIFF_COLORS[p.difficulty]
+        return "PLAYER", theme.CARD_WHITE
 
     @property
     def human(self) -> Player:
@@ -121,7 +146,17 @@ class GameScene(Scene):
 
     @property
     def busy(self) -> bool:
-        return bool(self.anims) or self.splash is not None or self.overlay is not None
+        return (bool(self.anims) or self.splash is not None or self.overlay is not None
+                or getattr(self.game, "pending", False))
+
+    @property
+    def flow_blocked(self) -> bool:
+        """Whether the computer players should wait. In network games the pause menu doesn't stop play."""
+        if self.anims or self.splash is not None:
+            return True
+        if self.overlay == "pause":
+            return not self.networked
+        return self.overlay is not None
 
     @property
     def my_turn(self) -> bool:
@@ -463,32 +498,91 @@ class GameScene(Scene):
             sfx.play("round_win" if g.went_out == HUMAN else "round_end")
         if kind in ("round", "game") and g.went_out == HUMAN:
             sfx.play("coin")
+        resume = lambda: self._set_overlay(None)  # noqa: E731
         if kind == "round":
-            self.overlay_buttons = [Button((cx - 140, 650, 280, 58), "NEXT ROUND", self.next_round, size=24,
-                                           **primary)]
+            if self.client is not None:
+                waiting = Button((cx - 160, 650, 320, 58), "WAITING FOR HOST", lambda: None, size=18)
+                waiting.enabled = False
+                self.overlay_buttons = [waiting]
+            else:
+                self.overlay_buttons = [Button((cx - 140, 650, 280, 58), "NEXT ROUND", self.next_round, size=24,
+                                               **primary)]
         elif kind == "game":
-            self.overlay_buttons = [
-                Button((cx - 290, 650, 270, 58), "PLAY AGAIN", self.restart, size=22, **primary),
-                Button((cx + 20, 650, 270, 58), "MAIN MENU", self.to_menu, size=22),
-            ]
+            if self.host is not None:
+                again = Button((cx - 290, 650, 270, 58), "BACK TO LOBBY", self.to_lobby, size=20, **primary)
+            elif self.client is not None:
+                again = Button((cx - 290, 650, 270, 58), "WAIT FOR HOST", lambda: None, size=18)
+                again.enabled = False
+            else:
+                again = Button((cx - 290, 650, 270, 58), "PLAY AGAIN", self.restart, size=22, **primary)
+            self.overlay_buttons = [again, Button((cx + 20, 650, 270, 58), "MAIN MENU", self.to_menu, size=22)]
         elif kind == "pause":
+            if self.host is not None:
+                options = [("RESUME", resume), ("END GAME", self.to_menu)]
+            elif self.client is not None:
+                options = [("RESUME", resume), ("CUSTOMIZE", self.customize), ("LEAVE GAME", self.to_menu)]
+            else:
+                options = [("RESUME", resume), ("CUSTOMIZE", self.customize), ("RESTART", self.restart),
+                           ("MAIN MENU", self.to_menu)]
             self.overlay_buttons = [
-                Button((cx - 140, 300, 280, 56), "RESUME", lambda: self._set_overlay(None), size=22, **primary),
-                Button((cx - 140, 368, 280, 56), "CUSTOMIZE", self.customize, size=20),
-                Button((cx - 140, 436, 280, 56), "RESTART", self.restart, size=20),
-                Button((cx - 140, 504, 280, 56), "MAIN MENU", self.to_menu, size=20),
-            ]
+                Button((cx - 140, 300 + k * 68, 280, 56), label, fn, size=22 if k == 0 else 20,
+                       **(primary if k == 0 else {}))
+                for k, (label, fn) in enumerate(options)]
+        elif kind == "disconnected":
+            sfx.play("error")
+            self.overlay_buttons = [Button((cx - 140, 470, 280, 58), "MAIN MENU", self.to_menu, size=22,
+                                           **primary)]
         else:
             self.overlay_buttons = []
 
     def next_round(self):
         self.game.next_round()
+        self._begin_round()
+
+    def _begin_round(self):
+        self._round_seen = self.game.round
         self.selected = []
+        self.choosing_skip = None
         self._set_overlay(None)
         self.log = []
         self._consume_events()
         self._round_splash()
         self.ai_timer = 0.5
+
+    # ================================================================== network
+
+    def _pump_network(self):
+        if self.host is not None:
+            self.host.pump()
+            while self.session.notices:
+                self.say(self.session.notices.pop(0), theme.DANGER)
+                sfx.play("skip")
+        if self.client is not None:
+            for msg in self.client.poll():
+                t = msg["t"]
+                if t == "error":
+                    self.error(msg.get("msg", "That move wasn't allowed."))
+                elif t == "notice":
+                    self.say(msg.get("msg", ""), theme.DANGER)
+                    sfx.play("skip")
+                elif t == "to_lobby":
+                    self.client.game = None
+                    from .multiplayer import GuestLobbyScene
+                    self.app.go(GuestLobbyScene(self.app, self.client))
+                    return
+            if self.client.status in ("closed", "failed") and self.overlay != "disconnected":
+                self._set_overlay("disconnected")
+
+    def leave_network(self):
+        if self.host is not None:
+            self.host.close()
+        if self.client is not None:
+            self.client.leave()
+
+    def to_lobby(self):
+        from .multiplayer import HostLobbyScene
+        self.host.back_to_lobby()
+        self.app.go(HostLobbyScene(self.app, self.host))
 
     def customize(self):
         from .customize import CustomizeScene
@@ -498,6 +592,7 @@ class GameScene(Scene):
         self.app.go(GameScene(self.app))
 
     def to_menu(self):
+        self.leave_network()
         from .menus import MenuScene
         self.app.go(MenuScene(self.app))
 
@@ -582,6 +677,12 @@ class GameScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self._pump_network()
+        g = self.game
+        if g.round != self._round_seen and not g.round_over:
+            self._begin_round()
+        if g.events:
+            self._consume_events()
         for a in self.anims:
             a.t += dt
         self.anims = [a for a in self.anims if not a.done]
@@ -595,7 +696,7 @@ class GameScene(Scene):
             self._set_overlay(self._pending_overlay)
             return
         g = self.game
-        if self.busy or g.round_over or g.current == HUMAN:
+        if self.flow_blocked or g.round_over or g.current not in self.ais:
             return
         self.ai_timer -= dt
         if self.ai_timer <= 0:
@@ -695,7 +796,8 @@ class GameScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
         theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20)
-        self._chip(surf, p.difficulty.upper(), (r.x + 60, r.y + 34), DIFF_COLORS[p.difficulty], size=10)
+        label, color = self.role_chip(i)
+        self._chip(surf, label, (r.x + 60, r.y + 34), color, size=10)
         self._counts(surf, p, r.right - 12, r.y + 8)
 
         inner = pygame.Rect(r.x + 8, r.y + 60, r.w - 16, r.h - 66)
@@ -932,14 +1034,26 @@ class GameScene(Scene):
         cx = theme.WIDTH // 2
         g = self.game
         if self.overlay == "pause":
-            theme.panel(surf, (cx - 200, 200, 400, 390))
+            theme.panel(surf, (cx - 200, 200, 400, 120 + 68 * len(self.overlay_buttons)))
             theme.logo(surf, "PAUSED", (cx, 250), 40, angle=4)
+            if self.networked:
+                theme.ptext(surf, "The game keeps going while you're here.", (cx, 290), 12, theme.TEXT_DIM,
+                            anchor="center")
+        elif self.overlay == "disconnected":
+            theme.panel(surf, (cx - 330, 250, 660, 300))
+            theme.logo(surf, "DISCONNECTED", (cx, 320), 44, angle=4)
+            reason = (self.client.error if self.client else None) or "The connection was lost."
+            theme.ptext(surf, reason, (cx, 400), 16, anchor="center")
         else:
             panel = pygame.Rect(cx - 400, 90, 800, 640)
             theme.panel(surf, panel)
             if self.overlay == "game":
                 winner = g.players[g.winner]
                 title = "YOU WIN!" if g.winner == HUMAN else f"{winner.name} WINS!"
+                if self.host is not None or self.client is not None:
+                    sub = "Back to the lobby to play again with the same people." if self.host else \
+                        "The host can start another game from the lobby."
+                    theme.ptext(surf, sub, (cx, 210), 15, theme.TEXT_DIM, anchor="center")
             else:
                 title = f"ROUND {g.round} OVER"
             theme.logo(surf, title, (cx, 150), 52, angle=4)
@@ -958,10 +1072,10 @@ class GameScene(Scene):
                 row = pygame.Rect(panel.x + 30, y, panel.w - 60, 52)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
                 theme.face(surf, (row.x + 34, row.centery), 19, i)
-                theme.ptext(surf, p.name, (row.x + 66, row.centery), 20, anchor="midleft")
-                if p.difficulty:
-                    self._chip(surf, p.difficulty.upper(), (row.x + 200, row.centery - 11),
-                               DIFF_COLORS[p.difficulty], size=10)
+                theme.ptext(surf, self.display_name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                if i != HUMAN and (p.difficulty or self.networked):
+                    label, color = self.role_chip(i)
+                    self._chip(surf, label, (row.x + 200, row.centery - 11), color, size=10)
                 done = "DONE!" if p.finished_all else f"{p.phase + 1}"
                 theme.ptext(surf, done, (panel.x + 380, row.centery), 22, theme.ACCENT, anchor="center")
                 if p.completed_this_round:

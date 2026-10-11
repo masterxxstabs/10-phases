@@ -179,3 +179,96 @@ class HueBar:
             knob = pygame.Rect(x - 6, self.rect.y - 6, 12, self.rect.h + 12)
             theme.rounded(surf, theme.CARD_WHITE, knob, 4)
             theme.rounded(surf, theme.OUTLINE, knob, 4, 2)
+
+
+def copy_text(value: str) -> bool:
+    """Put text on the system clipboard. Returns False if the platform doesn't allow it."""
+    try:
+        pygame.scrap.put_text(value)
+        return True
+    except (AttributeError, pygame.error):
+        pass
+    try:
+        if not pygame.scrap.get_init():
+            pygame.scrap.init()
+        pygame.scrap.put(pygame.SCRAP_TEXT, value.encode())
+        return True
+    except (AttributeError, pygame.error):
+        return False
+
+
+def paste_text() -> str:
+    try:
+        return pygame.scrap.get_text() or ""
+    except (AttributeError, pygame.error):
+        pass
+    try:
+        if not pygame.scrap.get_init():
+            pygame.scrap.init()
+        data = pygame.scrap.get(pygame.SCRAP_TEXT)
+        return data.decode(errors="ignore").rstrip("\x00") if data else ""
+    except (AttributeError, pygame.error):
+        return ""
+
+
+class TextInput:
+    """A one-line text box. Click to focus; supports typing, backspace and Ctrl+V."""
+
+    def __init__(self, rect, value: str = "", max_len: int = 20, placeholder: str = "",
+                 allowed: Callable[[str], bool] | None = None, upper: bool = True, size: int = 20,
+                 on_enter: Callable[[], None] | None = None):
+        self.rect = pygame.Rect(rect)
+        self.value = value
+        self.max_len = max_len
+        self.placeholder = placeholder
+        self.allowed = allowed or (lambda ch: ch.isalnum() or ch in " -_")
+        self.upper = upper
+        self.size = size
+        self.on_enter = on_enter
+        self.focused = False
+
+    def _insert(self, text: str):
+        for ch in text:
+            if self.upper:
+                ch = ch.upper()
+            if self.allowed(ch) and len(self.value) < self.max_len:
+                self.value += ch
+
+    def handle(self, event) -> bool:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            was = self.focused
+            self.focused = self.rect.collidepoint(event.pos)
+            if self.focused and not was:
+                sfx.play("select")
+            return self.focused
+        if not self.focused:
+            return False
+        if event.type == pygame.TEXTINPUT:
+            self._insert(event.text)
+            return True
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.value = self.value[:-1]
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                if self.on_enter:
+                    self.on_enter()
+            elif event.key == pygame.K_v and event.mod & (pygame.KMOD_CTRL | pygame.KMOD_META):
+                self._insert(paste_text())
+            elif event.key == pygame.K_ESCAPE:
+                self.focused = False
+            return True
+        return False
+
+    def draw(self, surf):
+        theme.panel(surf, self.rect, theme.INNER, theme.ACCENT if self.focused else theme.PANEL_EDGE,
+                    radius=8, shadow=False, edge_w=3 if self.focused else 2)
+        cy = self.rect.centery
+        if self.value:
+            r = theme.ptext(surf, self.value, (self.rect.x + 14, cy), self.size, anchor="midleft")
+        else:
+            r = pygame.Rect(self.rect.x + 14, cy, 0, 0)
+            theme.ptext(surf, self.placeholder, (self.rect.x + 14, cy), self.size, theme.TEXT_FAINT, None,
+                        anchor="midleft")
+        if self.focused and (pygame.time.get_ticks() // 500) % 2 == 0:
+            x = r.right + 3 if self.value else self.rect.x + 14
+            pygame.draw.rect(surf, theme.ACCENT, (x, cy - self.size // 2, 3, self.size))

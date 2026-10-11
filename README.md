@@ -18,6 +18,34 @@ python main.py          # or: python -m ten_phases
 
 Requires Python 3.10+.
 
+## Multiplayer
+
+Play with up to 5 friends, and fill any empty seats with computer players. There's no server to run, because one player's game hosts the table.
+
+**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**.
+- You get an invite code like `DAAAA-SCZH7-RE8PR`. **COPY CODE** puts it on your clipboard so you can send it to friends.
+- Choose how many computer players to add and their level, then press **START GAME** once your friends are in.
+- **KICK** removes a player from the lobby.
+
+**Join:** choose **MULTIPLAYER**, enter your name, then either:
+- **Same Wi-Fi:** the host's game appears under **GAMES NEARBY**. Press **JOIN**.
+- **Code:** paste the invite code (Ctrl+V or the **PASTE** button) and press **JOIN**.
+
+**Playing over the internet.** The invite code contains the host's address, so friends outside your network need a way to reach your computer. Pick one:
+1. **A free VPN like [Tailscale](https://tailscale.com) or ZeroTier (easiest).** Everyone installs it and joins the same network. In the lobby, the host presses **OTHER ADDRESS** until it shows the `100.x.x.x` VPN address, then sends that code.
+2. **Port forwarding.** On the host's router, forward **TCP port 47610** to the host's computer. In the lobby, type your public IP (search "what is my IP") into **PUBLIC IP**, press **USE IP**, and send that code.
+
+The first time you host, your firewall (for example Windows Defender Firewall) may ask whether to allow 10 Phases. Allow it on private networks, or friends won't be able to connect.
+
+**How it works**
+- The host's game is the only real copy of the game. Guests send their moves, and the host checks every one against the rules.
+- Each player only receives their own hand. Opponents' hands are sent as card counts.
+- If a guest disconnects mid-game, a Medium computer player takes over their seat.
+- If the host leaves, guests are told and sent back to the menu.
+- When a game ends, the host can take everyone **BACK TO LOBBY** to play again.
+- The pause menu doesn't stop a network game.
+- Invite codes contain a random room key and change every time you host.
+
 ## Customize the look
 
 Choose **CUSTOMIZE** from the main menu, or from the pause menu during a game to come back to the same hand. Changes show up right away in a live preview and across the whole game.
@@ -110,6 +138,9 @@ ten_phases/
   game.py       rules engine (turns, laying down, hitting, skips, scoring)
   ai.py         computer players and difficulty profiles
   settings.py   persisted settings
+  net/          multiplayer: invite codes and connections (protocol.py), LAN discovery,
+                host lobby and game session (host.py), guest connection (client.py),
+                per-player views and the guest's mirror of the game (snapshot.py)
   ui/           pygame front end (theme, card art, widgets, menus, game table)
                 all art and sound is generated in code (ui/sfx.py), so there are no asset files
 tests/          pytest suite for the rules and the AI
