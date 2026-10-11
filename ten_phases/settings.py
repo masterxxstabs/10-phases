@@ -12,6 +12,8 @@ DIFFICULTY_CHOICES = ("Easy", "Medium", "Hard", "Expert", "Mixed")
 SPEED_CHOICES = ("Slow", "Normal", "Fast")
 SPEED_DELAYS = {"Slow": 1.1, "Normal": 0.65, "Fast": 0.25}
 SFX_CHOICES = ("Off", "Low", "Medium", "High")
+TEXT_STYLES = ("Pixel", "Smooth")
+DEFAULT_TABLE = "#1e70e2"
 
 
 @dataclass
@@ -22,6 +24,18 @@ class Settings:
     hints: bool = True
     sort_by: str = "number"
     sfx: str = "Medium"
+    # Look
+    table_color: str = DEFAULT_TABLE
+    accent: str = "Yellow"
+    card_back: str = "Red"
+    card_palette: str = "Classic"
+    text_style: str = "Pixel"
+    sparkles: bool = True
+
+    def reset_look(self) -> None:
+        defaults = Settings()
+        for name in ("table_color", "accent", "card_back", "card_palette", "text_style", "sparkles"):
+            setattr(self, name, getattr(defaults, name))
 
     def opponent_difficulties(self) -> list[str]:
         if self.difficulty != "Mixed":
@@ -30,7 +44,8 @@ class Settings:
         return [ladder[i % len(ladder)] for i in range(self.opponents)]
 
     @classmethod
-    def load(cls, path: Path = SETTINGS_PATH) -> "Settings":
+    def load(cls, path: Path | None = None) -> "Settings":
+        path = path or SETTINGS_PATH
         try:
             data = json.loads(path.read_text())
             known = {f.name for f in fields(cls)}
@@ -43,10 +58,15 @@ class Settings:
             s.ai_speed = "Normal"
         if s.sfx not in SFX_CHOICES:
             s.sfx = "Medium"
+        if s.text_style not in TEXT_STYLES:
+            s.text_style = "Pixel"
+        if not (isinstance(s.table_color, str) and len(s.table_color) == 7 and s.table_color.startswith("#")):
+            s.table_color = DEFAULT_TABLE
         s.opponents = max(1, min(5, int(s.opponents)))
         return s
 
-    def save(self, path: Path = SETTINGS_PATH) -> None:
+    def save(self, path: Path | None = None) -> None:
+        path = path or SETTINGS_PATH
         try:
             path.write_text(json.dumps(asdict(self), indent=2))
         except OSError:

@@ -13,7 +13,7 @@ from . import sfx, theme
 from .card_art import card_with_shadow
 from .widgets import Button, Segmented
 
-PRIMARY = dict(color=theme.ACCENT, text_color=theme.OUTLINE)
+PRIMARY = dict(color="ACCENT", text_color="OUTLINE")
 
 
 class Scene:
@@ -44,14 +44,19 @@ class MenuScene(Scene):
         super().__init__(app)
         cx = theme.WIDTH // 2
         self.buttons = [
-            Button((cx - 150, 432, 300, 62), "PLAY", self._play, size=30, **PRIMARY),
-            Button((cx - 150, 508, 300, 52), "SETTINGS", lambda: app.go(SettingsScene(app))),
-            Button((cx - 150, 570, 300, 52), "HOW TO PLAY", lambda: app.go(HowToScene(app))),
-            Button((cx - 150, 632, 300, 52), "QUIT", app.quit),
+            Button((cx - 150, 424, 300, 60), "PLAY", self._play, size=30, **PRIMARY),
+            Button((cx - 150, 496, 300, 48), "SETTINGS", lambda: app.go(SettingsScene(app))),
+            Button((cx - 150, 554, 300, 48), "CUSTOMIZE", self._customize),
+            Button((cx - 150, 612, 300, 48), "HOW TO PLAY", lambda: app.go(HowToScene(app))),
+            Button((cx - 150, 670, 300, 48), "QUIT", app.quit),
         ]
         rng = random.Random()
         deck = [number(c, v) for c in COLORS for v in range(1, 13)] + [wild(), wild(), skip()]
         self.fan = rng.sample(deck, 7)
+
+    def _customize(self):
+        from .customize import CustomizeScene
+        self.app.go(CustomizeScene(self.app))
 
     def _play(self):
         from .game_scene import GameScene

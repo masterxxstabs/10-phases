@@ -16,6 +16,10 @@ OVAL_TILT = 32  # degrees, the oval leans to the right
 _cache: dict[tuple, pygame.Surface] = {}
 
 
+def clear_cache() -> None:
+    _cache.clear()
+
+
 def _rounded_mask(size, radius) -> pygame.Surface:
     mask = pygame.Surface(size, pygame.SRCALPHA)
     pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=radius)
@@ -94,7 +98,7 @@ def render_card(card: Card | None, w: int, h: int) -> pygame.Surface:
 
     if card is None:
         inner.fill(theme.CARD_BLACK)
-        oval = _oval((iw, ih), fill=theme.CARD_COLORS[Color.RED])
+        oval = _oval((iw, ih), fill=theme.CARD_BACK)
         inner.blit(oval, oval.get_rect(center=icenter))
         _number(inner, "10", (icenter[0], icenter[1] - ih * 0.07), int(ih * 0.3), theme.CARD_COLORS[Color.YELLOW],
                 outline=theme.CARD_BLACK)

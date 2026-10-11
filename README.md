@@ -18,6 +18,21 @@ python main.py          # or: python -m ten_phases
 
 Requires Python 3.10+.
 
+## Customize the look
+
+Choose **CUSTOMIZE** from the main menu, or from the pause menu during a game to come back to the same hand. Changes show up right away in a live preview and across the whole game.
+
+| Option | Choices |
+|---|---|
+| Table color | 9 presets (Classic Blue, Midnight, Felt Green, Cherry, Grape, Sunset, Teal, Bubblegum, Slate), or any color from the rainbow bar |
+| Accent | Yellow, Orange, Pink, Cyan, Lime, White (highlights, buttons, titles) |
+| Card back | Red, Blue, Green, Purple, Orange, Black |
+| Card colors | Classic, Pastel, Colorblind (Okabe-Ito colors that are easier to tell apart) |
+| Text | Pixel or Smooth |
+| Sparkles | On / Off |
+
+Every panel, outline and shadow is generated from your table color, so any color you pick looks consistent. **RESET LOOK** puts everything back to the default blue.
+
 ## Knowing your phase
 
 - **Your Phase board** (middle right) shows your phase in big letters and a 10-step tracker. It has a slot for each group you need, such as "SET OF 3". With Hints on, each slot fills with the cards you already have toward it and shows your progress (for example "2/3"). Once you lay down, your groups sit in those slots, and you can click them to add more cards.
@@ -73,7 +88,7 @@ Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild 
 | Sort hand by | Number / Color |
 | Sound FX | Off, Low, Medium, High |
 
-Settings are saved to `~/.ten_phases_settings.json`.
+Settings and your custom look are saved to `~/.ten_phases_settings.json`.
 
 ### What the difficulty levels do
 

@@ -101,7 +101,7 @@ class GameScene(Scene):
         self._pending_overlay: str | None = None
 
         bx = 1046
-        self.btn_lay = Button((bx, 548, 200, 50), "LAY DOWN", self.do_lay_down, theme.ACCENT, theme.OUTLINE, 20)
+        self.btn_lay = Button((bx, 548, 200, 50), "LAY DOWN", self.do_lay_down, "ACCENT", "OUTLINE", 20)
         self.btn_discard = Button((bx, 608, 200, 46), "DISCARD", self.do_discard_button, size=18)
         self.btn_sort = Button((bx, 664, 96, 42), "SORT", self.toggle_sort, size=16)
         self.btn_hint = Button((bx + 104, 664, 96, 42), "HINT", self.do_hint, size=16)
@@ -455,7 +455,7 @@ class GameScene(Scene):
         self.overlay = kind
         self._pending_overlay = None
         cx = theme.WIDTH // 2
-        primary = dict(color=theme.ACCENT, text_color=theme.OUTLINE)
+        primary = dict(color="ACCENT", text_color="OUTLINE")
         g = self.game
         if kind == "game":
             sfx.play("game_win" if g.winner == HUMAN else "game_lose")
@@ -473,9 +473,10 @@ class GameScene(Scene):
             ]
         elif kind == "pause":
             self.overlay_buttons = [
-                Button((cx - 140, 320, 280, 56), "RESUME", lambda: self._set_overlay(None), size=22, **primary),
-                Button((cx - 140, 390, 280, 56), "RESTART", self.restart, size=20),
-                Button((cx - 140, 460, 280, 56), "MAIN MENU", self.to_menu, size=20),
+                Button((cx - 140, 300, 280, 56), "RESUME", lambda: self._set_overlay(None), size=22, **primary),
+                Button((cx - 140, 368, 280, 56), "CUSTOMIZE", self.customize, size=20),
+                Button((cx - 140, 436, 280, 56), "RESTART", self.restart, size=20),
+                Button((cx - 140, 504, 280, 56), "MAIN MENU", self.to_menu, size=20),
             ]
         else:
             self.overlay_buttons = []
@@ -488,6 +489,10 @@ class GameScene(Scene):
         self._consume_events()
         self._round_splash()
         self.ai_timer = 0.5
+
+    def customize(self):
+        from .customize import CustomizeScene
+        self.app.go(CustomizeScene(self.app, back=lambda: self.app.go(self)))
 
     def restart(self):
         self.app.go(GameScene(self.app))
@@ -619,7 +624,7 @@ class GameScene(Scene):
 
     # ---------------------------------------------------------------- pieces
 
-    def _chip(self, surf, label: str, pos, color, fg=theme.OUTLINE, size: int = 12) -> pygame.Rect:
+    def _chip(self, surf, label: str, pos, color, fg="OUTLINE", size: int = 12) -> pygame.Rect:
         img = theme.pixel_surface(label, size, fg, None)
         r = pygame.Rect(pos[0], pos[1], img.get_width() + 12, img.get_height() + 4)
         theme.rounded(surf, theme.OUTLINE, r.move(0, 2), r.h // 2)
@@ -927,8 +932,8 @@ class GameScene(Scene):
         cx = theme.WIDTH // 2
         g = self.game
         if self.overlay == "pause":
-            theme.panel(surf, (cx - 200, 220, 400, 320))
-            theme.logo(surf, "PAUSED", (cx, 270), 40, angle=4)
+            theme.panel(surf, (cx - 200, 200, 400, 390))
+            theme.logo(surf, "PAUSED", (cx, 250), 40, angle=4)
         else:
             panel = pygame.Rect(cx - 400, 90, 800, 640)
             theme.panel(surf, panel)

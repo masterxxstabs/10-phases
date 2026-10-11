@@ -18,6 +18,7 @@ class App:
         self.clock = pygame.time.Clock()
         self.settings = Settings.load()
         sfx.init(self.settings.sfx)
+        theme.apply(self.settings)
         self.running = True
         from .menus import MenuScene
         self.scene = MenuScene(self)
