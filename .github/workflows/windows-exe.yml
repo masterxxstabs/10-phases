@@ -2,7 +2,8 @@ name: Build Windows exe
 
 # Builds dist/10Phases.exe: a single file that runs without Python installed.
 # - Every push to master: the exe is attached to the workflow run as an artifact.
-# - Pushing a tag like v1.0.0: the exe is also published on a GitHub Release.
+# - When master has a version (ten_phases/__init__.py) with no release yet, the workflow
+#   tags that commit and publishes a GitHub Release with the exe. Bump the version to release.
 on:
   push:
     branches: [master]
@@ -49,10 +50,28 @@ jobs:
           name: 10Phases-windows
           path: dist/10Phases.exe
 
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          ver=$(python -c "import ten_phases; print(ten_phases.__version__)")
+          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
+          if gh release view "v$ver" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # A new version number on master (or a pushed v* tag) publishes a Release with the exe.
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.exists == 'false' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: 10 Phases ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: dist/10Phases.exe
           body: |
             **Download `10Phases.exe` below and double-click it.** No install or Python needed.

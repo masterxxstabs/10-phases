@@ -19,7 +19,7 @@ Get **`10Phases.exe`** from the [Releases page](../../releases/latest) and doubl
 
 ## Build the exe yourself
 
-GitHub Actions builds `10Phases.exe` on Windows for every push to `master` (download it from the run's **Artifacts**). Pushing a tag such as `v1.0.1` also publishes the exe on a Release. To build locally:
+GitHub Actions builds `10Phases.exe` on Windows for every push to `master`; you can download it from the run's **Artifacts**. When the version in `ten_phases/__init__.py` hasn't been released yet, the workflow also tags the commit and publishes a Release with the exe, so to put out an update you just bump the version. To build locally:
 
 ```bash
 pip install -r requirements.txt pyinstaller pillow
