@@ -13,23 +13,30 @@ from . import theme
 from .card_art import card_with_shadow
 from .widgets import Button, Segmented
 
+PRIMARY = dict(color=theme.ACCENT, text_color=theme.OUTLINE)
+
 
 class Scene:
     def __init__(self, app):
         self.app = app
+        self.clock = 0.0
 
     def handle(self, event): ...
-    def update(self, dt: float): ...
+
+    def update(self, dt: float):
+        self.clock += dt
+
     def draw(self, surf): ...
 
 
-def _backdrop(surf):
-    surf.fill(theme.BG)
-    pygame.draw.circle(surf, theme.BG_DARK, (theme.WIDTH // 2, theme.HEIGHT + 260), 620)
+def backdrop(surf, t: float = 0.0, split_y: int | None = None):
+    surf.blit(theme.background(split_y), (0, 0))
+    theme.twinkle(surf, t)
 
 
-def _title(surf, y: int, size: int = 96):
-    theme.shadow_text(surf, "10 PHASES", (theme.WIDTH // 2, y), size, theme.ACCENT, shadow=theme.BG_DARK, offset=6)
+def status_bar(surf, msg: str):
+    pygame.draw.rect(surf, theme.STATUS_BAR, (0, theme.HEIGHT - 30, theme.WIDTH, 30))
+    theme.ptext(surf, msg, (theme.WIDTH // 2, theme.HEIGHT - 15), 18, theme.TEXT, None, anchor="center")
 
 
 class MenuScene(Scene):
@@ -37,10 +44,10 @@ class MenuScene(Scene):
         super().__init__(app)
         cx = theme.WIDTH // 2
         self.buttons = [
-            Button((cx - 140, 404, 280, 64), "PLAY", self._play, theme.ACCENT, theme.BG_DARK, size=28),
-            Button((cx - 140, 482, 280, 54), "Settings", lambda: app.go(SettingsScene(app))),
-            Button((cx - 140, 546, 280, 54), "How to Play", lambda: app.go(HowToScene(app))),
-            Button((cx - 140, 610, 280, 54), "Quit", app.quit),
+            Button((cx - 150, 432, 300, 62), "PLAY", self._play, size=30, **PRIMARY),
+            Button((cx - 150, 508, 300, 52), "SETTINGS", lambda: app.go(SettingsScene(app))),
+            Button((cx - 150, 570, 300, 52), "HOW TO PLAY", lambda: app.go(HowToScene(app))),
+            Button((cx - 150, 632, 300, 52), "QUIT", app.quit),
         ]
         rng = random.Random()
         deck = [number(c, v) for c in COLORS for v in range(1, 13)] + [wild(), wild(), skip()]
@@ -58,30 +65,29 @@ class MenuScene(Scene):
             self._play()
 
     def draw(self, surf):
-        _backdrop(surf)
+        backdrop(surf, self.clock)
         cx = theme.WIDTH // 2
         n = len(self.fan)
         for i, card in enumerate(self.fan):
             angle = (i - (n - 1) / 2) * 11
-            img, _ = card_with_shadow(card, 104, 156)
+            img, _ = card_with_shadow(card, 100, 150)
             img = pygame.transform.rotozoom(img, -angle, 1)
-            x = cx + (i - (n - 1) / 2) * 64
-            y = 268 + abs(i - (n - 1) / 2) ** 2 * 5
+            x = cx + (i - (n - 1) / 2) * 62
+            y = 288 + abs(i - (n - 1) / 2) ** 2 * 5
             surf.blit(img, img.get_rect(center=(x, y)))
-        _title(surf, 86, 84)
-        theme.text(surf, "a phase card game against the computer", (cx, 146), 20, theme.TEXT_DIM, anchor="center")
+        theme.logo(surf, "10 PHASES", (cx, 120), 92, angle=6)
         s = self.app.settings
-        info = f"{s.opponents} opponent{'s' if s.opponents > 1 else ''}  ·  {s.difficulty}  ·  {s.ai_speed} speed"
-        theme.text(surf, info, (cx, 700), 18, theme.TEXT_DIM, anchor="center")
+        info = f"{s.opponents} OPPONENT{'S' if s.opponents > 1 else ''}  -  {s.difficulty.upper()}"
         for b in self.buttons:
             b.draw(surf)
+        status_bar(surf, f"Press PLAY to start!   {info}")
 
 
 class SettingsScene(Scene):
     def __init__(self, app):
         super().__init__(app)
         s = app.settings
-        x, w = 440, 640
+        x, w = 470, 660
         self.rows = []
 
         def row(label, sub, control):
@@ -90,18 +96,18 @@ class SettingsScene(Scene):
         def set_attr(name, conv=lambda v: v):
             return lambda v: setattr(s, name, conv(v))
 
-        row("AI difficulty", "Mixed gives you one of each, easiest first",
-            Segmented((x, 170, w, 56), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
-        row("Opponents", "How many computer players join the table",
-            Segmented((x, 270, w, 56), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
-        row("AI speed", "How long the computer pauses between moves",
-            Segmented((x, 370, w, 56), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
-        row("Hints", "Show the Hint button during play",
-            Segmented((x, 470, w, 56), ["On", "Off"], "On" if s.hints else "Off",
+        row("AI LEVEL", "Mixed: one of each, easiest first",
+            Segmented((x, 160, w, 60), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
+        row("OPPONENTS", "Computer players at the table",
+            Segmented((x, 256, w, 60), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
+        row("AI SPEED", "Pause between computer moves",
+            Segmented((x, 352, w, 60), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
+        row("HINTS", "Hint button + phase progress",
+            Segmented((x, 448, w, 60), ["On", "Off"], "On" if s.hints else "Off",
                       set_attr("hints", lambda v: v == "On")))
-        row("Sort hand by", "You can also switch this in game",
-            Segmented((x, 570, w, 56), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
-        self.back = Button((theme.WIDTH // 2 - 120, 680, 240, 60), "Done", self._done, theme.ACCENT, theme.BG_DARK, 24)
+        row("SORT HAND", "You can switch this in game",
+            Segmented((x, 544, w, 60), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
+        self.back = Button((theme.WIDTH // 2 - 130, 660, 260, 60), "DONE", self._done, size=24, **PRIMARY)
 
     def _done(self):
         self.app.settings.save()
@@ -118,32 +124,34 @@ class SettingsScene(Scene):
                 return
 
     def draw(self, surf):
-        _backdrop(surf)
-        theme.shadow_text(surf, "SETTINGS", (theme.WIDTH // 2, 80), 56, theme.ACCENT, shadow=theme.BG_DARK, offset=4)
+        backdrop(surf, self.clock)
+        theme.logo(surf, "SETTINGS", (theme.WIDTH // 2, 76), 52, angle=4)
+        theme.panel(surf, (110, 140, 1060, 488), theme.PANEL)
         for label, sub, c in self.rows:
-            theme.text(surf, label, (120, c.rect.y + 4), 24)
-            theme.text(surf, sub, (120, c.rect.y + 34), 15, theme.TEXT_DIM, bold=False)
+            theme.ptext(surf, label, (140, c.rect.y + 6), 22, theme.ACCENT)
+            theme.ptext(surf, sub, (140, c.rect.y + 36), 14, theme.TEXT_DIM)
             c.draw(surf)
         self.back.draw(surf)
+        status_bar(surf, "Settings are saved when you press DONE.")
 
 
 HOW_TO = [
-    "Be the first to complete all 10 phases. Each round you try to complete your current phase.",
-    "On your turn: draw one card from the deck or the discard pile, then discard one card.",
-    "When you hold your phase, select its cards and press Lay Down. The groups are worked out for you.",
-    "After laying down you can hit: select cards and click any group on the table to add to it.",
-    "The round ends when someone empties their hand. Players who laid down move to the next phase.",
-    "Cards left in hand score penalty points: 1-9 = 5, 10-12 = 10, Skip = 15, Wild = 25. Low score wins ties.",
-    "Set = same number. Run = numbers in a row. Wilds stand in for anything. Skips make a player lose a turn.",
-    "Shortcuts: Space draws from the deck, double-click a card to discard it, Esc opens the menu.",
+    "Be the first to complete all 10 phases. Each round you work on your current phase.",
+    "On your turn: draw from the deck or the discard pile, then discard one card.",
+    "When you hold your phase, select its cards and press LAY DOWN. Groups are worked out for you.",
+    "After laying down, select cards and click any group on the table (or your own) to add to it.",
+    "The round ends when someone empties their hand. Everyone who laid down moves up a phase.",
+    "Chips: everyone antes 1 chip into the pot each round. Whoever goes out wins the pot!",
+    "Cards left in hand cost points: 1-9 = 5, 10-12 = 10, Skip = 15, Wild = 25. Low score breaks ties.",
+    "Space draws, double-click discards, Esc opens the menu.",
 ]
 
 
 class HowToScene(Scene):
     def __init__(self, app):
         super().__init__(app)
-        self.back = Button((theme.WIDTH // 2 - 120, 712, 240, 60), "Back", lambda: app.go(MenuScene(app)),
-                           theme.ACCENT, theme.BG_DARK, 24)
+        self.back = Button((theme.WIDTH // 2 - 130, 690, 260, 58), "BACK", lambda: app.go(MenuScene(app)),
+                           size=24, **PRIMARY)
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -152,32 +160,36 @@ class HowToScene(Scene):
         self.back.handle(event)
 
     def draw(self, surf):
-        _backdrop(surf)
-        theme.shadow_text(surf, "HOW TO PLAY", (theme.WIDTH // 2, 64), 52, theme.ACCENT, shadow=theme.BG_DARK, offset=4)
-        y = 120
+        backdrop(surf, self.clock)
+        theme.logo(surf, "HOW TO PLAY", (theme.WIDTH // 2, 64), 50, angle=4)
+        left = pygame.Rect(40, 120, 720, 550)
+        theme.panel(surf, left)
+        y = left.y + 20
         for line in HOW_TO:
-            pygame.draw.circle(surf, theme.ACCENT, (80, y + 11), 5)
-            for chunk in _wrap(line, 17, 620):
-                theme.text(surf, chunk, (96, y), 17, theme.TEXT, bold=False)
-                y += 24
-            y += 10
-        panel = pygame.Rect(780, 120, 440, 570)
-        theme.rounded(surf, theme.PANEL, panel, 16)
-        theme.text(surf, "THE 10 PHASES", (panel.x + 24, panel.y + 18), 20, theme.ACCENT)
+            theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
+            for chunk in _wrap(line, 17, left.w - 70):
+                theme.text(surf, chunk, (left.x + 44, y), 17, theme.TEXT, bold=False)
+                y += 23
+            y += 12
+        panel = pygame.Rect(790, 120, 450, 550)
+        theme.panel(surf, panel)
+        theme.ptext(surf, "THE 10 PHASES", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
         for i in range(NUM_PHASES):
-            yy = panel.y + 62 + i * 50
-            pygame.draw.circle(surf, theme.PANEL_LIGHT, (panel.x + 42, yy + 12), 18)
-            theme.text(surf, str(i + 1), (panel.x + 42, yy + 12), 18, anchor="center")
-            theme.text(surf, describe_phase(i), (panel.x + 76, yy + 1), 19, bold=False)
+            yy = panel.y + 66 + i * 47
+            pygame.draw.circle(surf, theme.OUTLINE, (panel.x + 40, yy + 14), 19)
+            pygame.draw.circle(surf, theme.ACCENT, (panel.x + 40, yy + 12), 18)
+            theme.ptext(surf, str(i + 1), (panel.x + 40, yy + 12), 16, theme.OUTLINE, None, anchor="center")
+            theme.ptext(surf, describe_phase(i), (panel.x + 72, yy + 2), 18)
         self.back.draw(surf)
+        status_bar(surf, "Good luck!")
 
 
-def _wrap(msg: str, size: int, width: int) -> list[str]:
-    f = theme.font(size, False)
+def _wrap(msg: str, size: int, width: int, pixel: bool = False) -> list[str]:
+    measure = (lambda t: theme.pixel_width(t, size)) if pixel else (lambda t: theme.font(size, False).size(t)[0])
     words, lines, cur = msg.split(), [], ""
     for w in words:
         trial = f"{cur} {w}".strip()
-        if f.size(trial)[0] > width and cur:
+        if measure(trial) > width and cur:
             lines.append(cur)
             cur = w
         else:

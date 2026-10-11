@@ -1,4 +1,4 @@
-"""Flat buttons and segmented controls."""
+"""Handheld-style buttons and segmented controls."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from . import theme
 
 class Button:
     def __init__(self, rect, label: str, on_click: Callable[[], None], color=theme.PANEL_LIGHT,
-                 text_color=theme.TEXT, size: int = 20, radius: int = 12):
+                 text_color=theme.TEXT, size: int = 20, radius: int = 10):
         self.rect = pygame.Rect(rect)
         self.label = label
         self.on_click = on_click
@@ -41,15 +41,16 @@ class Button:
         if not self.visible:
             return
         hover = self.enabled and self.rect.collidepoint(pygame.mouse.get_pos())
-        color = self.color if self.enabled else theme.PANEL
+        color = self.color if self.enabled else theme.INNER
         if hover:
-            color = theme.lighten(color, 18)
-        r = self.rect.move(0, 2) if self._pressed and hover else self.rect
-        if self.enabled and not (self._pressed and hover):
-            theme.rounded(surf, theme.darken(color, 40), self.rect.move(0, 4), self.radius)
-        theme.rounded(surf, color, r, self.radius)
+            color = theme.lighten(color, 22)
+        pressed = self._pressed and hover
+        r = self.rect.move(-2, 3) if pressed else self.rect
+        theme.panel(surf, r, color, theme.PANEL_EDGE if self.enabled else theme.PANEL_LIGHT, self.radius,
+                    shadow=self.enabled and not pressed)
         tc = self.text_color if self.enabled else theme.TEXT_FAINT
-        theme.text(surf, self.label, r.center, self.size, tc, anchor="center")
+        outline = None if tc == theme.OUTLINE else theme.OUTLINE
+        theme.ptext(surf, self.label, r.center, self.size, tc, outline, anchor="center")
 
 
 class Segmented:
@@ -76,15 +77,15 @@ class Segmented:
         return False
 
     def draw(self, surf):
-        theme.rounded(surf, theme.BG_DARK, self.rect, 12)
+        theme.panel(surf, self.rect, theme.INNER, radius=10)
         mouse = pygame.mouse.get_pos()
         for i, opt in enumerate(self.options):
-            seg = self._seg(i).inflate(-8, -8)
+            seg = self._seg(i).inflate(-10, -10)
             if opt == self.value:
-                theme.rounded(surf, theme.ACCENT, seg, 9)
-                color = theme.BG_DARK
+                theme.rounded(surf, theme.ACCENT, seg, 7)
+                theme.rounded(surf, theme.OUTLINE, seg, 7, 2)
+                theme.ptext(surf, opt, seg.center, self.size, theme.OUTLINE, None, anchor="center")
             else:
                 if seg.collidepoint(mouse):
-                    theme.rounded(surf, theme.PANEL_HOVER, seg, 9)
-                color = theme.TEXT
-            theme.text(surf, opt, seg.center, self.size, color, anchor="center")
+                    theme.rounded(surf, theme.PANEL_HOVER, seg, 7)
+                theme.ptext(surf, opt, seg.center, self.size, theme.TEXT, anchor="center")

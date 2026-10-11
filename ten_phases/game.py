@@ -9,6 +9,8 @@ from .cards import Card, Deck
 from .phases import NUM_PHASES, PHASES, GroupType, Requirement, arrange_group, is_valid_group, match_groups, partition_for_phase
 
 HAND_SIZE = 10
+STARTING_CHIPS = 24
+ANTE = 1
 
 
 class RuleError(Exception):
@@ -23,6 +25,7 @@ class Player:
     hand: list[Card] = field(default_factory=list)
     phase: int = 0          # index into PHASES; NUM_PHASES means all done
     score: int = 0
+    chips: int = STARTING_CHIPS
     laid_down: bool = False
     skips_pending: int = 0
     completed_this_round: bool = False
@@ -72,6 +75,7 @@ class Game:
         self.events: list[Event] = []
         self.game_over = False
         self.winner: int | None = None
+        self.pot = 0
         # Public memory every player could have, used by the smarter AIs.
         self.picked_from_discard: dict[int, list[Card]] = {}
         self.start_round()
@@ -87,12 +91,19 @@ class Game:
         self._meld_ids = 0
         self.round_over = False
         self.round_points: dict[int, int] = {}
+        self.round_chips: dict[int, int] = {}
         self.picked_from_discard = {i: [] for i in range(len(self.players))}
         for p in self.players:
             p.hand = []
             p.laid_down = False
             p.skips_pending = 0
             p.completed_this_round = False
+        # Everyone antes into the pot; whoever goes out wins it.
+        for i, p in enumerate(self.players):
+            paid = min(ANTE, p.chips)
+            p.chips -= paid
+            self.pot += paid
+            self.round_chips[i] = -paid
         for _ in range(HAND_SIZE):
             for p in self.players:
                 p.hand.append(self.deck.draw())
@@ -296,11 +307,14 @@ class Game:
             p.score += pts
             if p.completed_this_round:
                 p.phase += 1
+        winnings, self.pot = self.pot, 0
+        self.players[went_out].chips += winnings
+        self.round_chips[went_out] = self.round_chips.get(went_out, 0) + winnings
         self.events.append(Event("round_end", player=went_out))
         finished = [i for i, p in enumerate(self.players) if p.finished_all]
         if finished:
             self.game_over = True
-            self.winner = min(finished, key=lambda i: self.players[i].score)
+            self.winner = min(finished, key=lambda i: (self.players[i].score, -self.players[i].chips))
             self.events.append(Event("game_over", player=self.winner))
 
     def next_round(self) -> None:
@@ -309,8 +323,9 @@ class Game:
         self.start_round()
 
     def standings(self) -> list[int]:
-        """Player indices from best to worst: highest phase first, then lowest score."""
-        return sorted(range(len(self.players)), key=lambda i: (-self.players[i].phase, self.players[i].score))
+        """Player indices from best to worst: highest phase, then lowest score, then most chips."""
+        return sorted(range(len(self.players)),
+                      key=lambda i: (-self.players[i].phase, self.players[i].score, -self.players[i].chips))
 
     def pop_events(self) -> list[Event]:
         ev, self.events = self.events, []

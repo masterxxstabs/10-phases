@@ -110,3 +110,16 @@ def test_ai_plays_a_full_game(difficulty):
     assert g.game_over
     assert sum(len(p.hand) for p in g.players) + len(g.deck) + len(g.discard_pile) + \
         sum(len(m.cards) for m in g.melds) == 108
+
+
+def test_pot_goes_to_player_who_goes_out():
+    g = new_game(3)
+    assert g.pot == 3 and all(p.chips == 23 for p in g.players)
+    i = g.current
+    p = g.players[i]
+    p.hand = [number(Color.RED, 4)]
+    g.draw_from_deck(i)
+    p.hand = [p.hand[-1]]
+    g.discard(i, p.hand[0])
+    assert g.round_over and g.pot == 0
+    assert p.chips == 26 and g.round_chips[i] == 2

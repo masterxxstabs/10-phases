@@ -1,6 +1,13 @@
 # 10 Phases
 
-A Phase 10–style card game in Python. You play against 1–5 computer opponents at the difficulty you choose. The UI is flat, and the cards are bright with a white border and a tilted oval, in the style of classic shedding card games.
+A Phase 10–style card game in Python. You play against 1–5 computer opponents at the difficulty you choose.
+
+The look is inspired by handheld card games like UNO 52 on the Nintendo DS:
+- a bright blue sparkle table split into two "screens"
+- opponents in outlined boxes along the top, each showing their cards, chips, phase and laid-down groups
+- the piles in the middle with orange turn arrows and a tilted logo
+- pixel lettering and a black status bar
+- bright cards with a white border and a tilted oval
 
 ## Run it
 
@@ -11,11 +18,21 @@ python main.py          # or: python -m ten_phases
 
 Requires Python 3.10+.
 
+## Knowing your phase
+
+- **Your Phase board** (middle right) shows your phase in big letters and a 10-step tracker. It has a slot for each group you need, such as "SET OF 3". With Hints on, each slot fills with the cards you already have toward it and shows your progress (for example "2/3"). Once you lay down, your groups sit in those slots, and you can click them to add more cards.
+- A **"PHASE N" banner** introduces each round, and a "PHASE COMPLETE!" banner appears when you lay down.
+- Every opponent's box shows their phase, what it needs, and the groups they've laid down.
+
+## Chips
+
+Everyone starts with 24 chips. At the start of each round, every player antes 1 chip into the pot, and whoever goes out wins the whole pot. Chips break ties after phases and penalty points.
+
 ## How to play
 
 - On your turn, click the **deck** or the **discard pile** to draw (Space draws from the deck).
 - To complete your phase, select its cards and press **Lay Down**. The game works out how to split them into sets and runs.
-- After you've laid down, select cards and click any group on the **table** to add to it.
+- After you've laid down, select cards and click any group to add to it. Groups are in the opponent boxes and on your Phase board.
 - To discard, select one card and press **Discard** or click the discard pile. You can also double-click or right-click a card.
 - Discarding a **Skip** with more than one opponent lets you click the opponent to skip.
 - **Hint** suggests a move (you can turn it off in Settings). **Sort** switches between sorting by number and by color.
@@ -33,7 +50,7 @@ Requires Python 3.10+.
 | 9 | 1 set of 5 + 1 set of 2 |
 | 10 | 1 set of 5 + 1 set of 3 |
 
-Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild = 25. The first player to complete phase 10 wins. If several players finish phase 10 in the same round, the lowest score wins.
+Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild = 25. The first player to complete phase 10 wins. If several players finish phase 10 in the same round, the lowest score wins, then the most chips.
 
 ## Settings
 
@@ -42,7 +59,7 @@ Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild 
 | AI difficulty | Easy, Medium, Hard, Expert, Mixed (one of each, easiest first) |
 | Opponents | 1–5 |
 | AI speed | Slow, Normal, Fast |
-| Hints | On / Off |
+| Hints | On / Off (Hint button and progress on your Phase board) |
 | Sort hand by | Number / Color |
 
 Settings are saved to `~/.ten_phases_settings.json`.
@@ -68,6 +85,7 @@ ten_phases/
   ai.py         computer players and difficulty profiles
   settings.py   persisted settings
   ui/           pygame front end (theme, card art, widgets, menus, game table)
+                all art is drawn in code, so there are no image files
 tests/          pytest suite for the rules and the AI
 ```
 
