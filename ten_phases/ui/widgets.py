@@ -6,7 +6,7 @@ from typing import Callable
 
 import pygame
 
-from . import theme
+from . import sfx, theme
 
 
 class Button:
@@ -33,6 +33,7 @@ class Button:
             was = self._pressed
             self._pressed = False
             if was and self.rect.collidepoint(event.pos):
+                sfx.play("click")
                 self.on_click()
                 return True
         return False
@@ -71,6 +72,7 @@ class Segmented:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(event.pos):
             for i, opt in enumerate(self.options):
                 if self._seg(i).collidepoint(event.pos):
+                    sfx.play("select")
                     self.value = opt
                     self.on_change(opt)
             return True

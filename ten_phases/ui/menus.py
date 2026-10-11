@@ -8,8 +8,8 @@ import pygame
 
 from ..cards import COLORS, number, skip, wild
 from ..phases import NUM_PHASES, describe_phase
-from ..settings import DIFFICULTY_CHOICES, SPEED_CHOICES
-from . import theme
+from ..settings import DIFFICULTY_CHOICES, SFX_CHOICES, SPEED_CHOICES
+from . import sfx, theme
 from .card_art import card_with_shadow
 from .widgets import Button, Segmented
 
@@ -97,16 +97,22 @@ class SettingsScene(Scene):
             return lambda v: setattr(s, name, conv(v))
 
         row("AI LEVEL", "Mixed: one of each, easiest first",
-            Segmented((x, 160, w, 60), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
+            Segmented((x, 156, w, 56), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
         row("OPPONENTS", "Computer players at the table",
-            Segmented((x, 256, w, 60), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
+            Segmented((x, 236, w, 56), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
         row("AI SPEED", "Pause between computer moves",
-            Segmented((x, 352, w, 60), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
+            Segmented((x, 316, w, 56), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
         row("HINTS", "Hint button + phase progress",
-            Segmented((x, 448, w, 60), ["On", "Off"], "On" if s.hints else "Off",
+            Segmented((x, 396, w, 56), ["On", "Off"], "On" if s.hints else "Off",
                       set_attr("hints", lambda v: v == "On")))
         row("SORT HAND", "You can switch this in game",
-            Segmented((x, 544, w, 60), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
+            Segmented((x, 476, w, 56), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
+
+        def set_sfx(v):
+            s.sfx = v
+            sfx.set_volume(v)
+            sfx.play("coin")
+        row("SOUND FX", "Sound effect volume", Segmented((x, 556, w, 56), list(SFX_CHOICES), s.sfx, set_sfx))
         self.back = Button((theme.WIDTH // 2 - 130, 660, 260, 60), "DONE", self._done, size=24, **PRIMARY)
 
     def _done(self):
@@ -126,7 +132,7 @@ class SettingsScene(Scene):
     def draw(self, surf):
         backdrop(surf, self.clock)
         theme.logo(surf, "SETTINGS", (theme.WIDTH // 2, 76), 52, angle=4)
-        theme.panel(surf, (110, 140, 1060, 488), theme.PANEL)
+        theme.panel(surf, (110, 136, 1060, 500), theme.PANEL)
         for label, sub, c in self.rows:
             theme.ptext(surf, label, (140, c.rect.y + 6), 22, theme.ACCENT)
             theme.ptext(surf, sub, (140, c.rect.y + 36), 14, theme.TEXT_DIM)

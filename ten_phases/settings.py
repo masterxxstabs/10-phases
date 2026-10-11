@@ -11,6 +11,7 @@ SETTINGS_PATH = Path.home() / ".ten_phases_settings.json"
 DIFFICULTY_CHOICES = ("Easy", "Medium", "Hard", "Expert", "Mixed")
 SPEED_CHOICES = ("Slow", "Normal", "Fast")
 SPEED_DELAYS = {"Slow": 1.1, "Normal": 0.65, "Fast": 0.25}
+SFX_CHOICES = ("Off", "Low", "Medium", "High")
 
 
 @dataclass
@@ -20,6 +21,7 @@ class Settings:
     ai_speed: str = "Normal"
     hints: bool = True
     sort_by: str = "number"
+    sfx: str = "Medium"
 
     def opponent_difficulties(self) -> list[str]:
         if self.difficulty != "Mixed":
@@ -39,6 +41,8 @@ class Settings:
             s.difficulty = "Medium"
         if s.ai_speed not in SPEED_CHOICES:
             s.ai_speed = "Normal"
+        if s.sfx not in SFX_CHOICES:
+            s.sfx = "Medium"
         s.opponents = max(1, min(5, int(s.opponents)))
         return s
 

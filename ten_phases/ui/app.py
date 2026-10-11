@@ -5,17 +5,19 @@ from __future__ import annotations
 import pygame
 
 from ..settings import Settings
-from . import theme
+from . import sfx, theme
 
 
 class App:
     def __init__(self):
+        pygame.mixer.pre_init(sfx.RATE, -16, 1, 512)
         pygame.init()
         pygame.display.set_caption("10 Phases")
         flags = pygame.SCALED | pygame.RESIZABLE
         self.screen = pygame.display.set_mode((theme.WIDTH, theme.HEIGHT), flags)
         self.clock = pygame.time.Clock()
         self.settings = Settings.load()
+        sfx.init(self.settings.sfx)
         self.running = True
         from .menus import MenuScene
         self.scene = MenuScene(self)

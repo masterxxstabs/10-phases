@@ -24,6 +24,16 @@ Requires Python 3.10+.
 - A **"PHASE N" banner** introduces each round, and a "PHASE COMPLETE!" banner appears when you lay down.
 - Every opponent's box shows their phase, what it needs, and the groups they've laid down.
 
+## Sound effects
+
+Retro chiptune sound effects play for:
+- button clicks and selecting cards
+- drawing, discarding, laying down and adding to groups
+- skips, your turn, mistakes, reshuffles and the phase banner
+- winning the pot, and the end of a round or game
+
+They're generated in code when the game starts, so there are no audio files. You can set the volume to Off, Low, Medium or High in Settings. There's no music.
+
 ## Chips
 
 Everyone starts with 24 chips. At the start of each round, every player antes 1 chip into the pot, and whoever goes out wins the whole pot. Chips break ties after phases and penalty points.
@@ -61,6 +71,7 @@ Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild 
 | AI speed | Slow, Normal, Fast |
 | Hints | On / Off (Hint button and progress on your Phase board) |
 | Sort hand by | Number / Color |
+| Sound FX | Off, Low, Medium, High |
 
 Settings are saved to `~/.ten_phases_settings.json`.
 
@@ -85,7 +96,7 @@ ten_phases/
   ai.py         computer players and difficulty profiles
   settings.py   persisted settings
   ui/           pygame front end (theme, card art, widgets, menus, game table)
-                all art is drawn in code, so there are no image files
+                all art and sound is generated in code (ui/sfx.py), so there are no asset files
 tests/          pytest suite for the rules and the AI
 ```
 

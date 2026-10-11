@@ -15,9 +15,9 @@ import pygame
 from ..ai import AIPlayer, plan_phase
 from ..cards import Card
 from ..game import Game, Player, RuleError
-from ..phases import NUM_PHASES, GroupType, describe_phase
+from ..phases import NUM_PHASES, PHASES, GroupType, describe_phase
 from ..settings import SPEED_DELAYS
-from . import theme
+from . import sfx, theme
 from .card_art import card_with_shadow
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
@@ -134,6 +134,11 @@ class GameScene(Scene):
 
     def error(self, msg: str):
         self.flash = (msg, 2.6)
+        sfx.play("error")
+
+    def tip(self, msg: str):
+        self.flash = (msg, 2.6)
+        sfx.play("turn")
 
     def name(self, i: int) -> str:
         return self.game.players[i].name.title()
@@ -145,6 +150,15 @@ class GameScene(Scene):
     def selected_cards(self) -> list[Card]:
         by_id = {c.id: c for c in self.human.hand}
         return [by_id[i] for i in self.selected if i in by_id]
+
+    def shown_phase(self, i: int) -> int:
+        """The phase this round is being played for. Once a round ends the engine has already
+        moved finishers up, but the table should keep showing what they just completed."""
+        p = self.game.players[i]
+        return p.phase - 1 if self.game.round_over and p.completed_this_round else p.phase
+
+    def shown_requirements(self, i: int):
+        return PHASES[min(self.shown_phase(i), NUM_PHASES - 1)]
 
     def opponent_indices(self) -> list[int]:
         return list(range(1, len(self.game.players)))
@@ -173,6 +187,7 @@ class GameScene(Scene):
         self.splash = (f"PHASE {p.phase + 1}", f"ROUND {self.game.round}  -  {describe_phase(p.phase).upper()}",
                        2.2, 2.2)
         self.say(f"Round {self.game.round}: you need {describe_phase(p.phase)}", theme.ACCENT)
+        sfx.play("phase")
 
     # ================================================================== layout
 
@@ -192,7 +207,7 @@ class GameScene(Scene):
 
     def slot_rects(self, i: int) -> list[pygame.Rect]:
         """One slot per phase requirement: on your board, or inside an opponent's box."""
-        reqs = self.game.players[i].requirements
+        reqs = self.shown_requirements(i)
         n = len(reqs)
         if i == HUMAN:
             area = pygame.Rect(BOARD.x + 14, BOARD.y + 74, BOARD.w - 28, BOARD.h - 86)
@@ -241,9 +256,17 @@ class GameScene(Scene):
         _, table_cards = self.table_layout()
         hand = self.hand_layout()
         stagger = 0.0
+        played: set[str] = set()
+
+        def sound(name: str):
+            if name not in played:  # one of each per batch, so hits don't stack into noise
+                played.add(name)
+                sfx.play(name)
+
         for ev in g.pop_events():
             k = ev.kind
             if k == "draw":
+                sound("draw")
                 src = DECK_RECT if ev.source == "deck" else DISCARD_RECT
                 if ev.player == HUMAN:
                     self.new_card_id = ev.card.id
@@ -257,29 +280,34 @@ class GameScene(Scene):
                     where = f"took the {ev.card.label()}" if ev.source == "discard" else "drew a card"
                     self.say(f"{self.name(ev.player)} {where}", theme.TEXT_DIM)
             elif k == "discard":
+                sound("discard")
                 start = origin.get(ev.card.id, self.player_anchor(ev.player))
                 self.anims.append(FlyingCard(ev.card, start, DISCARD_RECT, hide_id=ev.card.id))
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} discarded {ev.card.label()}", theme.TEXT_DIM)
             elif k == "lay":
-                p = g.players[ev.player]
+                sound("lay")
                 for m in [m for m in g.melds if m.owner == ev.player]:
                     for c in m.cards:
                         start = origin.get(c.id, self.player_anchor(ev.player))
                         self.anims.append(FlyingCard(c, start, table_cards[c.id], 0.34, stagger, hide_id=c.id))
                         stagger += 0.04
                 if ev.player == HUMAN:
-                    self.say(f"You completed phase {p.phase + 1}!", theme.SUCCESS)
-                    self.splash = ("PHASE COMPLETE!", f"PHASE {p.phase + 1} DONE - NOW PLAY OUT YOUR HAND", 1.5, 1.5)
+                    n = self.shown_phase(ev.player) + 1
+                    self.say(f"You completed phase {n}!", theme.SUCCESS)
+                    self.splash = ("PHASE COMPLETE!", f"PHASE {n} DONE - NOW PLAY OUT YOUR HAND", 1.5, 1.5)
                 else:
-                    self.say(f"{self.name(ev.player)} completed phase {p.phase + 1}!", theme.SUCCESS)
+                    self.say(f"{self.name(ev.player)} completed phase {self.shown_phase(ev.player) + 1}!",
+                             theme.SUCCESS)
             elif k == "hit":
+                sound("hit")
                 start = origin.get(ev.card.id, self.player_anchor(ev.player))
                 self.anims.append(FlyingCard(ev.card, start, table_cards[ev.card.id], 0.3, stagger, hide_id=ev.card.id))
                 stagger += 0.06
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} played {ev.card.label()}", theme.TEXT_DIM)
             elif k == "skip":
+                sound("skip")
                 who = "You" if ev.player == HUMAN else self.name(ev.player)
                 target = "you" if ev.target == HUMAN else self.name(ev.target)
                 self.say(f"{who} skipped {target}!", theme.DANGER)
@@ -287,9 +315,11 @@ class GameScene(Scene):
                 who = "You lose" if ev.player == HUMAN else f"{self.name(ev.player)} loses"
                 self.say(f"{who} a turn", theme.DANGER)
             elif k == "reshuffle":
+                sound("shuffle")
                 self.say("Discards shuffled into the deck", theme.TEXT_DIM)
             elif k == "turn" and ev.player == HUMAN:
                 self.new_card_id = None
+                sound("turn")
             elif k in ("round_end", "game_over"):
                 self._pending_overlay = "game" if g.game_over else "round"
 
@@ -384,16 +414,16 @@ class GameScene(Scene):
         action = self.hint_ai.next_action(self.game, HUMAN)
         kind = action[0]
         if kind == "draw":
-            self.error("Hint: take the discard." if action[1] == "discard" else "Hint: draw from the deck.")
+            self.tip("Hint: take the discard." if action[1] == "discard" else "Hint: draw from the deck.")
         elif kind == "lay":
             self.selected = [c.id for g in action[1] for c in g]
-            self.error("Hint: you have your phase! Press LAY DOWN.")
+            self.tip("Hint: you have your phase! Press LAY DOWN.")
         elif kind == "hit":
             self.selected = [action[1].id]
-            self.error(f"Hint: play the {action[1].label()} on a group.")
+            self.tip(f"Hint: play the {action[1].label()} on a group.")
         else:
             self.selected = [action[1].id]
-            self.error(f"Hint: discard the {action[1].label()}.")
+            self.tip(f"Hint: discard the {action[1].label()}.")
 
     # ================================================================== AI
 
@@ -426,6 +456,13 @@ class GameScene(Scene):
         self._pending_overlay = None
         cx = theme.WIDTH // 2
         primary = dict(color=theme.ACCENT, text_color=theme.OUTLINE)
+        g = self.game
+        if kind == "game":
+            sfx.play("game_win" if g.winner == HUMAN else "game_lose")
+        elif kind == "round":
+            sfx.play("round_win" if g.went_out == HUMAN else "round_end")
+        if kind in ("round", "game") and g.went_out == HUMAN:
+            sfx.play("coin")
         if kind == "round":
             self.overlay_buttons = [Button((cx - 140, 650, 280, 58), "NEXT ROUND", self.next_round, size=24,
                                            **primary)]
@@ -531,8 +568,10 @@ class GameScene(Scene):
             return
         if cid in self.selected:
             self.selected.remove(cid)
+            sfx.play("deselect")
         else:
             self.selected.append(cid)
+            sfx.play("select")
 
     # ================================================================== update
 
@@ -656,9 +695,10 @@ class GameScene(Scene):
 
         inner = pygame.Rect(r.x + 8, r.y + 60, r.w - 16, r.h - 66)
         theme.rounded(surf, theme.INNER, inner, 8)
-        phase_txt = "ALL DONE" if p.finished_all else f"PHASE {p.phase + 1}"
+        shown = self.shown_phase(i)
+        phase_txt = "ALL DONE" if shown >= NUM_PHASES else f"PHASE {shown + 1}"
         theme.ptext(surf, phase_txt, (inner.x + 8, inner.y + 6), 16, theme.ACCENT)
-        desc = describe_phase(min(p.phase, NUM_PHASES - 1))
+        desc = describe_phase(min(shown, NUM_PHASES - 1))
         f = theme.font(12, False)
         while f.size(desc)[0] > inner.w - 16 and len(desc) > 4:
             desc = desc[:-2]
@@ -668,7 +708,7 @@ class GameScene(Scene):
         elif p.laid_down:
             self._chip(surf, "LAID", (inner.right - 50, inner.y + 6), theme.SUCCESS, size=10)
         melds = [m for m in g.melds if m.owner == i]
-        for k, (req, slot) in enumerate(zip(p.requirements, self.slot_rects(i))):
+        for k, (req, slot) in enumerate(zip(self.shown_requirements(i), self.slot_rects(i))):
             meld = melds[k] if k < len(melds) else None
             self._requirement_slot(surf, i, req, slot, meld, hidden, table_cards)
 
@@ -760,14 +800,15 @@ class GameScene(Scene):
         h = self.human
         theme.panel(surf, BOARD)
         theme.ptext(surf, "YOUR PHASE", (BOARD.x + 16, BOARD.y + 10), 14, theme.TEXT_DIM)
-        title = "ALL 10 DONE!" if h.finished_all else f"PHASE {h.phase + 1}"
+        shown = self.shown_phase(HUMAN)
+        title = "ALL 10 DONE!" if shown >= NUM_PHASES else f"PHASE {shown + 1}"
         theme.ptext(surf, title, (BOARD.x + 16, BOARD.y + 30), 30, theme.ACCENT)
         # 10-step tracker
         for k in range(NUM_PHASES):
             cx = BOARD.x + 222 + k * 34
             cy = BOARD.y + 38
-            done = k < h.phase
-            current = k == h.phase
+            done = k < shown
+            current = k == shown
             pulse = (math.sin(self.clock * 5) + 1) / 2 if current else 0
             pygame.draw.circle(surf, theme.OUTLINE, (cx, cy + 2), 15)
             fill = theme.ACCENT if done else theme.CARD_WHITE if current else theme.INNER
@@ -776,9 +817,10 @@ class GameScene(Scene):
                 pygame.draw.circle(surf, theme.ACCENT, (cx, cy), int(16 + pulse * 3), 3)
             color = theme.OUTLINE if done or current else theme.TEXT_FAINT
             theme.ptext(surf, str(k + 1), (cx, cy), 12, color, None, anchor="center")
-        reqs = h.requirements
+        reqs = self.shown_requirements(HUMAN)
         melds = [m for m in self.game.melds if m.owner == HUMAN]
-        previews = self._phase_preview() if not h.laid_down and self.app.settings.hints else None
+        previews = self._phase_preview() if not h.laid_down and not self.game.round_over and self.app.settings.hints \
+            else None
         for k, (req, slot) in enumerate(zip(reqs, self.slot_rects(HUMAN))):
             meld = melds[k] if k < len(melds) else None
             preview = previews[k] if previews is not None else None
