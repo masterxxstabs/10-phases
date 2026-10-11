@@ -9,6 +9,7 @@ from __future__ import annotations
 import colorsys
 import math
 import random
+from pathlib import Path
 
 import pygame
 
@@ -83,18 +84,31 @@ def font(size: int, bold: bool = True, heavy: bool = False) -> pygame.font.Font:
 _pixel_cache: dict[tuple, pygame.Surface] = {}
 
 
-def _pixel_font(base: int) -> pygame.font.Font:
-    key = ("pixel", base)
-    f = _font_cache.get(key)
-    if f is None:
-        path = pygame.font.match_font("pressstart2p,silkscreen,pixeloperator,freesansbold,dejavusans", bold=True)
-        f = pygame.font.Font(path, base) if path else pygame.font.Font(None, int(base * 1.4))
-        _font_cache[key] = f
-    return f
+PIXEL_FONT_PATH = Path(__file__).resolve().parent.parent / "assets" / "fonts" / "Jersey10-Regular.ttf"
+
+
+def _pixel_font(px: int) -> pygame.font.Font | None:
+    """The bundled pixel font (Jersey 10, SIL Open Font License), or None if it's missing."""
+    key = ("pixel", px)
+    if key not in _font_cache:
+        try:
+            _font_cache[key] = pygame.font.Font(str(PIXEL_FONT_PATH), px)
+        except (OSError, pygame.error):
+            _font_cache[key] = None
+    return _font_cache[key]
+
+
+def _outline_blit(target: pygame.Surface, body: pygame.Surface, edge: pygame.Surface | None, w: int) -> None:
+    if edge is not None:
+        for dx in range(-w, w + 1):
+            for dy in range(-w, w + 1):
+                if dx or dy:
+                    target.blit(edge, (w + dx, w + dy))
+    target.blit(body, (w, w))
 
 
 def pixel_surface(msg: str, size: int = 18, color="TEXT", outline="OUTLINE") -> pygame.Surface:
-    """Chunky, unsmoothed text with a 1-pixel outline, scaled up 2x like a handheld screen.
+    """Crisp pixel-font text with a dark outline, like a handheld screen.
 
     With the Smooth text style, the same call renders anti-aliased text instead."""
     color, outline = resolve(color), resolve(outline)
@@ -104,22 +118,17 @@ def pixel_surface(msg: str, size: int = 18, color="TEXT", outline="OUTLINE") -> 
         return img
     if len(_pixel_cache) > 3000:
         _pixel_cache.clear()
-    if not PIXEL_TEXT:
+    f = _pixel_font(max(15, round(size * 1.35))) if PIXEL_TEXT else None
+    if f is None:
         img = outlined(msg, max(9, int(size * 0.82)), color, outline, 2, heavy=False) if outline is not None \
             else font(max(9, int(size * 0.82))).render(msg, True, color)
         _pixel_cache[key] = img
         return img
-    base = max(6, size // 2)
-    f = _pixel_font(base)
     body = f.render(msg, False, color)
-    w, h = body.get_size()
-    small = pygame.Surface((w + 2, h + 2), pygame.SRCALPHA)
-    if outline is not None:
-        edge = f.render(msg, False, outline)
-        for dx, dy in ((0, 1), (2, 1), (1, 0), (1, 2), (0, 0), (2, 2), (0, 2), (2, 0)):
-            small.blit(edge, (dx, dy))
-    small.blit(body, (1, 1))
-    img = pygame.transform.scale(small, (small.get_width() * 2, small.get_height() * 2))
+    w = 1 if size < 15 else 2
+    edge = f.render(msg, False, outline) if outline is not None else None
+    img = pygame.Surface((body.get_width() + 2 * w, body.get_height() + 2 * w), pygame.SRCALPHA)
+    _outline_blit(img, body, edge, w)
     _pixel_cache[key] = img
     return img
 

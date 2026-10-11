@@ -26,6 +26,7 @@ class Settings:
     sfx: str = "Medium"
     player_name: str = "PLAYER"
     auto_update: bool = True
+    chip_bank: int = 0   # chips kept from finished games
     # Look
     table_color: str = DEFAULT_TABLE
     accent: str = "Yellow"
@@ -65,6 +66,7 @@ class Settings:
         if not (isinstance(s.table_color, str) and len(s.table_color) == 7 and s.table_color.startswith("#")):
             s.table_color = DEFAULT_TABLE
         s.opponents = max(1, min(5, int(s.opponents)))
+        s.chip_bank = max(0, int(s.chip_bank)) if isinstance(s.chip_bank, (int, float)) else 0
         return s
 
     def save(self, path: Path | None = None) -> None:

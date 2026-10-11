@@ -15,7 +15,7 @@ import pygame
 from ..ai import AIPlayer, plan_phase
 from ..cards import Card
 from ..game import Game, Player, RuleError
-from ..phases import NUM_PHASES, PHASES, GroupType, describe_phase
+from ..phases import NUM_PHASES, PHASES, GroupType, arrange_run, describe_phase
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
@@ -110,6 +110,8 @@ class GameScene(Scene):
         self.new_card_id: int | None = None
         self._last_click = (None, 0)
         self._pending_overlay: str | None = None
+        self.moves: dict[int, list[str]] = {}   # recent moves per player, for the hover info
+        self._banked: int | None = None
 
         bx = 1046
         self.btn_lay = Button((bx, 548, 200, 50), "LAY DOWN", self.do_lay_down, "ACCENT", "OUTLINE", 20)
@@ -162,6 +164,13 @@ class GameScene(Scene):
     def my_turn(self) -> bool:
         g = self.game
         return g.current == HUMAN and not g.round_over and not self.busy
+
+    def note(self, i: int | None, text: str):
+        if i is None:
+            return
+        moves = self.moves.setdefault(i, [])
+        moves.append(text)
+        del moves[:-4]
 
     def say(self, msg: str, color=theme.TEXT):
         self.log.append((msg, color))
@@ -314,14 +323,18 @@ class GameScene(Scene):
                     self.anims.append(FlyingCard(face, src, self.player_anchor(ev.player)))
                     where = f"took the {ev.card.label()}" if ev.source == "discard" else "drew a card"
                     self.say(f"{self.name(ev.player)} {where}", theme.TEXT_DIM)
+                self.note(ev.player, f"Took the {ev.card.label()} from the discard" if ev.source == "discard"
+                          else "Drew from the deck")
             elif k == "discard":
                 sound("discard")
                 start = origin.get(ev.card.id, self.player_anchor(ev.player))
                 self.anims.append(FlyingCard(ev.card, start, DISCARD_RECT, hide_id=ev.card.id))
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} discarded {ev.card.label()}", theme.TEXT_DIM)
+                self.note(ev.player, f"Discarded the {ev.card.label()}")
             elif k == "lay":
                 sound("lay")
+                self.note(ev.player, f"Laid down phase {self.shown_phase(ev.player) + 1}")
                 for m in [m for m in g.melds if m.owner == ev.player]:
                     for c in m.cards:
                         start = origin.get(c.id, self.player_anchor(ev.player))
@@ -341,14 +354,17 @@ class GameScene(Scene):
                 stagger += 0.06
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} played {ev.card.label()}", theme.TEXT_DIM)
+                self.note(ev.player, f"Added the {ev.card.label()} to a group")
             elif k == "skip":
                 sound("skip")
                 who = "You" if ev.player == HUMAN else self.name(ev.player)
                 target = "you" if ev.target == HUMAN else self.name(ev.target)
                 self.say(f"{who} skipped {target}!", theme.DANGER)
+                self.note(ev.player, f"Skipped {self.display_name(ev.target).title()}")
             elif k == "skipped":
                 who = "You lose" if ev.player == HUMAN else f"{self.name(ev.player)} loses"
                 self.say(f"{who} a turn", theme.DANGER)
+                self.note(ev.player, "Was skipped")
             elif k == "reshuffle":
                 sound("shuffle")
                 self.say("Discards shuffled into the deck", theme.TEXT_DIM)
@@ -494,6 +510,11 @@ class GameScene(Scene):
         g = self.game
         if kind == "game":
             sfx.play("game_win" if g.winner == HUMAN else "game_lose")
+            if self._banked is None:
+                # Chips you finish a game with are kept in your bank (shown on the main menu).
+                self._banked = max(0, self.human.chips)
+                self.app.settings.chip_bank += self._banked
+                self.app.settings.save()
         elif kind == "round":
             sfx.play("round_win" if g.went_out == HUMAN else "round_end")
         if kind in ("round", "game") and g.went_out == HUMAN:
@@ -716,6 +737,12 @@ class GameScene(Scene):
         self._draw_my_box(surf, hidden)
         for a in self.anims:
             a.draw(surf)
+        if not self.overlay and not self.splash:
+            mouse = pygame.mouse.get_pos()
+            for i in self.opponent_indices():
+                if self.panel_rect(i).collidepoint(mouse):
+                    self._draw_player_info(surf, i, table_cards)
+                    break
         msg = self.flash[0] if self.flash else self._status()[0]
         status_bar(surf, msg)
         if self.splash:
@@ -1050,10 +1077,13 @@ class GameScene(Scene):
             if self.overlay == "game":
                 winner = g.players[g.winner]
                 title = "YOU WIN!" if g.winner == HUMAN else f"{winner.name} WINS!"
+                bank = f"+{self._banked or 0} CHIPS BANKED!   BANK: {self.app.settings.chip_bank:,}"
+                r_ = theme.ptext(surf, bank, (cx + 12, 204), 18, theme.ACCENT, anchor="center")
+                theme.chip(surf, (r_.x - 16, r_.centery + 2), 10, theme.ACCENT)
                 if self.host is not None or self.client is not None:
                     sub = "Back to the lobby to play again with the same people." if self.host else \
                         "The host can start another game from the lobby."
-                    theme.ptext(surf, sub, (cx, 210), 15, theme.TEXT_DIM, anchor="center")
+                    theme.ptext(surf, sub, (cx, 228), 13, theme.TEXT_DIM, anchor="center")
             else:
                 title = f"ROUND {g.round} OVER"
             theme.logo(surf, title, (cx, 150), 52, angle=4)
@@ -1090,3 +1120,111 @@ class GameScene(Scene):
                             theme.ACCENT if dc > 0 else theme.TEXT_DIM, anchor="center")
         for b in self.overlay_buttons:
             b.draw(surf)
+
+    # ---------------------------------------------------------------- hover info
+
+    def _meld_detail(self, m) -> str:
+        naturals = [c for c in m.cards if c.is_number]
+        if not naturals:
+            return ""
+        if m.type is GroupType.SET:
+            return f"ALL {naturals[0].value}s"
+        if m.type is GroupType.COLOR:
+            return naturals[0].color.value.upper()
+        values = [v for _, v in arrange_run(m.cards)]
+        return f"{values[0]} TO {values[-1]}"
+
+    def _draw_player_info(self, surf, i: int, table_cards):
+        """The hover card for an opponent: phase, progress, table groups and recent moves."""
+        g = self.game
+        p = g.players[i]
+        box = self.panel_rect(i)
+        reqs = self.shown_requirements(i)
+        melds = [m for m in g.melds if m.owner == i]
+        picked = g.picked_from_discard.get(i, [])[-10:]
+        moves = self.moves.get(i, [])[-3:]
+        w = 660
+        h = 196 + len(reqs) * 86 + 72 + (24 + 19 * len(moves) if moves else 0)
+        x = max(10, min(theme.WIDTH - w - 10, box.centerx - w // 2))
+        rect = pygame.Rect(x, box.bottom + 8, w, h)
+        theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
+        pygame.draw.polygon(surf, theme.ACCENT, [(box.centerx - 12, rect.y), (box.centerx + 12, rect.y),
+                                                 (box.centerx, rect.y - 10)])
+
+        # Name, role and phase
+        theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
+        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
+        label, color = self.role_chip(i)
+        self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
+        if g.current == i and not g.round_over:
+            self._chip(surf, "THEIR TURN", (rect.x + 172, rect.y + 44), theme.ACCENT, size=12)
+        shown = self.shown_phase(i)
+        theme.ptext(surf, "ALL DONE!" if shown >= NUM_PHASES else f"PHASE {shown + 1}",
+                    (rect.right - 18, rect.y + 10), 30, theme.ACCENT, anchor="topright")
+        theme.ptext(surf, "OF 10", (rect.right - 18, rect.y + 46), 14, theme.TEXT_DIM, anchor="topright")
+
+        # 10-step tracker and what the phase needs
+        y = rect.y + 88
+        for k in range(NUM_PHASES):
+            cx = rect.x + 30 + k * 28
+            done, current = k < shown, k == shown
+            pygame.draw.circle(surf, theme.OUTLINE, (cx, y + 2), 12)
+            pygame.draw.circle(surf, theme.ACCENT if done else theme.CARD_WHITE if current else theme.INNER, (cx, y), 11)
+            theme.ptext(surf, str(k + 1), (cx, y), 11, theme.OUTLINE if done or current else theme.TEXT_FAINT, None,
+                        anchor="center")
+        needs = theme.ptext(surf, "NEEDS", (rect.x + 316, y), 14, theme.TEXT_DIM, anchor="midleft")
+        theme.ptext(surf, describe_phase(min(shown, NUM_PHASES - 1)).upper(), (needs.right + 8, y), 16,
+                    anchor="midleft")
+
+        # Stats
+        if p.laid_down:
+            status, status_color = "LAID DOWN", theme.SUCCESS
+        elif p.skips_pending:
+            status, status_color = "SKIPPED", theme.DANGER
+        else:
+            status, status_color = "NOT YET", theme.TEXT
+        stats = [("CARDS", str(len(p.hand)), theme.TEXT), ("CHIPS", str(p.chips), theme.ACCENT),
+                 ("POINTS", str(p.score), theme.TEXT), ("PHASE", status, status_color)]
+        sw = (w - 36 - 3 * 10) // 4
+        for k, (name, value, vc) in enumerate(stats):
+            sb = pygame.Rect(rect.x + 18 + k * (sw + 10), rect.y + 110, sw, 56)
+            theme.rounded(surf, theme.INNER, sb, 8)
+            theme.ptext(surf, name, (sb.x + 10, sb.y + 6), 12, theme.TEXT_DIM)
+            theme.ptext(surf, value, (sb.x + 10, sb.bottom - 6), 22, vc, anchor="bottomleft")
+
+        # Table groups, one row per requirement, at full card size
+        y = rect.y + 174
+        theme.ptext(surf, "ON THE TABLE", (rect.x + 18, y), 14, theme.ACCENT)
+        y += 22
+        for k, req in enumerate(reqs):
+            row = pygame.Rect(rect.x + 18, y, w - 36, 80)
+            theme.rounded(surf, theme.INNER, row, 8)
+            theme.ptext(surf, REQ_LABEL[req.type].format(req.size), (row.x + 12, row.y + 12), 16, theme.ACCENT)
+            meld = melds[k] if k < len(melds) else None
+            if meld is None:
+                theme.ptext(surf, "Not laid down yet", (row.x + 190, row.centery), 16, theme.TEXT_FAINT, anchor="midleft")
+            else:
+                theme.ptext(surf, self._meld_detail(meld), (row.x + 12, row.y + 36), 20)
+                theme.ptext(surf, f"{len(meld.cards)} CARDS", (row.x + 12, row.y + 60), 12, theme.TEXT_DIM)
+                cards = meld.ordered()
+                step = min(50, (row.w - 190 - 46) / max(1, len(cards) - 1)) if len(cards) > 1 else 0
+                for n, c in enumerate(cards):
+                    img, _ = card_with_shadow(c, 46, 69)
+                    surf.blit(img, (row.x + 180 + n * step, row.y + 5))
+            y += 86
+
+        # Cards they took from the discard pile this round (public info)
+        theme.ptext(surf, "PICKED UP FROM THE DISCARD THIS ROUND", (rect.x + 18, y), 14, theme.ACCENT)
+        if picked:
+            for n, c in enumerate(picked):
+                img, _ = card_with_shadow(c, 30, 45)
+                surf.blit(img, (rect.x + 18 + n * 36, y + 20))
+        else:
+            theme.ptext(surf, "Nothing yet", (rect.x + 18, y + 24), 15, theme.TEXT_FAINT)
+        y += 72
+
+        if moves:
+            theme.ptext(surf, "LAST MOVES", (rect.x + 18, y), 14, theme.ACCENT)
+            for n, m in enumerate(reversed(moves)):
+                theme.text(surf, m, (rect.x + 24, y + 20 + n * 19), 14, theme.TEXT if n == 0 else theme.TEXT_DIM,
+                           bold=False)

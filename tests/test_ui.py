@@ -115,3 +115,38 @@ def test_menu_shows_version_and_each_update_state(app):
     assert not menu.btn_restart.visible
     assert __version__
     up.state, up.info, up.dismissed = "idle", None, False
+
+
+def test_pixel_font_is_bundled_and_used(app):
+    from ten_phases.ui import theme
+
+    assert theme.PIXEL_FONT_PATH.exists()
+    assert theme._pixel_font(20) is not None
+
+
+def test_chips_are_banked_once_when_a_game_ends(app):
+    app.settings.chip_bank = 100
+    scene = GameScene(app)
+    scene.splash = None
+    g = scene.game
+    scene.human.chips = 31
+    g.game_over, g.winner, g.went_out = True, 0, 0
+    scene._set_overlay("game")
+    scene._set_overlay("game")  # showing it again must not bank twice
+    assert app.settings.chip_bank == 131 and scene._banked == 31
+    scene.draw(app.screen)
+
+
+def test_hovering_an_opponent_shows_their_info(app, monkeypatch):
+    scene = GameScene(app)
+    scene.splash = None
+    g = scene.game
+    seat = 1
+    g.picked_from_discard[seat] = g.players[seat].hand[:2]
+    scene.note(seat, "Drew from the deck")
+    monkeypatch.setattr(pygame.mouse, "get_pos", lambda: scene.panel_rect(seat).center)
+    calls = []
+    original = scene._draw_player_info
+    monkeypatch.setattr(scene, "_draw_player_info", lambda *a: (calls.append(a[1]), original(*a)))
+    scene.draw(app.screen)
+    assert calls == [seat]

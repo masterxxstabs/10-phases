@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.2.0
+
+- Hover over any player to see their phase, cards on the table, chips and recent moves
+- Easier-to-read pixel text with a new bundled pixel font
+- Chips you finish a game with are saved to your Chip Bank on the main menu
+
 ## 1.1.0
 
 - The game now updates itself: new versions download in the background and install with one click

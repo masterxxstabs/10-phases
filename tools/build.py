@@ -56,6 +56,8 @@ def main() -> None:
         "--workpath", str(BUILD / "pyinstaller"),
         "--specpath", str(BUILD),
         "--icon", str(BUILD / ("icon.ico" if os.name == "nt" else "icon.png")),
+        # The bundled pixel font (and its license) travel inside the exe.
+        "--add-data", f"{ROOT / 'ten_phases' / 'assets'}{os.pathsep}ten_phases/assets",
         # Not used by the game; keeps the exe smaller.
         "--exclude-module", "numpy", "--exclude-module", "tkinter", "--exclude-module", "PIL",
     ]

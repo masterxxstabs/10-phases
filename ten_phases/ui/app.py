@@ -86,6 +86,8 @@ def smoke_test() -> None:
     from .game_scene import GameScene
 
     app = App(check_updates=False)
+    if theme._pixel_font(20) is None:
+        raise SystemExit("smoke test: the bundled pixel font is missing")
     app.run(max_frames=30)
     app.running = True
     app.go(GameScene(app))

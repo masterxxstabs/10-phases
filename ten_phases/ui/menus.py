@@ -150,7 +150,18 @@ class MenuScene(Scene):
         for b in self.buttons:
             b.draw(surf)
         self._draw_update(surf)
+        self._draw_bank(surf)
         status_bar(surf, f"Press PLAY to start!   {info}")
+
+    def _draw_bank(self, surf):
+        """Chips kept from finished games."""
+        box = pygame.Rect(20, 20, 250, 78)
+        theme.panel(surf, box)
+        for k in range(3):
+            theme.chip_stack(surf, (box.x + 30 + k * 10, box.bottom - 22), 13, theme.CHIP_COLORS[k], 3 - k)
+        theme.ptext(surf, "CHIP BANK", (box.x + 82, box.y + 10), 14, theme.TEXT_DIM)
+        theme.ptext(surf, f"{self.app.settings.chip_bank:,}", (box.x + 82, box.bottom - 8), 30, theme.ACCENT,
+                    anchor="bottomleft")
 
 
 class SettingsScene(Scene):
@@ -224,6 +235,8 @@ HOW_TO = [
     "The round ends when someone empties their hand. Everyone who laid down moves up a phase.",
     "Chips: everyone antes 1 chip into the pot each round. Whoever goes out wins the pot!",
     "Cards left in hand cost points: 1-9 = 5, 10-12 = 10, Skip = 15, Wild = 25. Low score breaks ties.",
+    "Hover over a player's box to see their phase, what they've laid down and their recent moves.",
+    "Chips you finish a game with go into your CHIP BANK on the main menu.",
     "Space draws, double-click discards, Esc opens the menu.",
 ]
 

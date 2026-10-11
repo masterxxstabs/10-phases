@@ -97,7 +97,7 @@ Choose **CUSTOMIZE** from the main menu, or from the pause menu during a game to
 | Accent | Yellow, Orange, Pink, Cyan, Lime, White (highlights, buttons, titles) |
 | Card back | Red, Blue, Green, Purple, Orange, Black |
 | Card colors | Classic, Pastel, Colorblind (Okabe-Ito colors that are easier to tell apart) |
-| Text | Pixel or Smooth |
+| Text | Pixel (the bundled [Jersey 10](https://fonts.google.com/specimen/Jersey+10) font, SIL Open Font License) or Smooth |
 | Sparkles | On / Off |
 
 Every panel, outline and shadow is generated from your table color, so any color you pick looks consistent. **RESET LOOK** puts everything back to the default blue.
@@ -121,6 +121,17 @@ They're generated in code when the game starts, so there are no audio files. You
 ## Chips
 
 Everyone starts with 24 chips. At the start of each round, every player antes 1 chip into the pot, and whoever goes out wins the whole pot. Chips break ties after phases and penalty points.
+
+When a game ends, the chips you finished with go into your **Chip Bank**, which is shown in the top-left of the main menu and saved between sessions.
+
+## Player info on hover
+
+Hover over any player's box to open their info card:
+- their phase on a 10-step tracker, and what that phase needs
+- their card count, chips, points, and whether they've laid down
+- their groups on the table at full card size, labelled like "SET OF 4 · ALL 9s" or "RUN OF 4 · 3 TO 6"
+- the cards they picked up from the discard pile this round
+- their last few moves
 
 ## How to play
 
