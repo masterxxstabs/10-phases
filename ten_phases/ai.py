@@ -75,6 +75,10 @@ def _candidates(req: Requirement, pool: list[Card]):
             by[c.value].append(c)
         for cards in by.values():
             yield cards[:n]
+            # Also try holding one copy back, so a second group of the same number (or a run
+            # through it) still gets a natural card: five 4s + wilds can be 4444W and 4W.
+            if len(cards) >= 2:
+                yield cards[:min(n, len(cards)) - 1]
     elif req.type is GroupType.COLOR:
         byc: dict[Color, list[Card]] = defaultdict(list)
         for c in pool:
@@ -135,10 +139,13 @@ def build_groups(plan: Plan) -> list[list[Card]]:
 
 
 class AIPlayer:
-    def __init__(self, difficulty: str = "Medium", rng: random.Random | None = None):
+    def __init__(self, difficulty: str = "Medium", rng: random.Random | None = None, advisor: bool = False):
+        """advisor=True is the Hint button: it never gives up progress on your phase to play
+        defence (an opponent AI may, on purpose); defence and points only break ties."""
         self.difficulty = difficulty
         self.profile = PROFILES[difficulty]
         self.rng = rng or random.Random()
+        self.advisor = advisor
 
     # ---------------------------------------------------------------- public API
 
@@ -185,6 +192,13 @@ class AIPlayer:
             else:
                 match = any(c.is_number and abs(c.value - top.value) <= (0 if self._set_only(p) else 1) for c in p.hand)
             return "discard" if match and self.rng.random() < 0.7 else "deck"
+
+        if self.advisor:
+            # Hint: only say "take the discard" when that card really gets you closer to your phase.
+            now = plan_phase(p.requirements, p.hand).deficit
+            after = min(plan_phase(p.requirements, [c for c in p.hand + [top] if c is not d]).deficit
+                        for d in p.hand)
+            return "discard" if after < now else "deck"
 
         current = self._evaluate(game, me, p.hand)
         best_with = min(self._evaluate(game, me, [c for c in p.hand + [top] if c is not d])
@@ -240,6 +254,8 @@ class AIPlayer:
                     score += 50
             else:
                 score = self._evaluate(game, me, rest)
+                if self.advisor:
+                    score += 1000 * plan_phase(p.requirements, rest).deficit
             if card.is_wild:
                 score += 100
             if card.is_skip:

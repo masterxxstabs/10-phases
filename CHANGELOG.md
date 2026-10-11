@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.2.2
+
+- Hint fixes: it now spots phases where two sets share a number (like 4444+W and 4+W)
+- The Hint never tells you to discard a card you need for your phase
+- "Take the discard" is only suggested when that card actually gets you closer
+
 ## 1.2.1
 
 - Computer players now get random names from a pool of 70, so every game has a different cast

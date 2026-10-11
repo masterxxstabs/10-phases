@@ -95,7 +95,7 @@ class GameScene(Scene):
             players += [Player(name, difficulty=d) for name, d in zip(names, diffs)]
             self.game = Game(players)
             self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
-        self.hint_ai = AIPlayer("Expert", random.Random(0))
+        self.hint_ai = AIPlayer("Expert", random.Random(0), advisor=True)
         self.delay = SPEED_DELAYS[s.ai_speed]
 
         self.selected: list[int] = []
