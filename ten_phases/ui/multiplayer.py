@@ -177,8 +177,9 @@ class MultiplayerScene(Scene):
             theme.rounded(surf, theme.INNER, row, 10)
             theme.face(surf, (row.x + 30, row.centery), 20, k + 1)
             theme.ptext(surf, f"{g.get('name', 'HOST')}'S GAME", (row.x + 62, row.y + 12), 18)
-            theme.ptext(surf, f"{g.get('players', 1)}/{g.get('max', MAX_PLAYERS)} PLAYERS", (row.x + 62, row.y + 38),
-                        13, theme.TEXT_DIM)
+            app_v = f"  -  V{g['app']}" if isinstance(g.get("app"), str) else ""
+            theme.ptext(surf, f"{g.get('players', 1)}/{g.get('max', MAX_PLAYERS)} PLAYERS{app_v}",
+                        (row.x + 62, row.y + 38), 13, theme.TEXT_DIM)
             b.draw(surf)
         for b in self.buttons:
             b.draw(surf)

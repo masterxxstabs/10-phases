@@ -45,6 +45,9 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "10Phases.exe --smoke-test exited with $($p.ExitCode)" }
           "Smoke test passed; size: {0:N1} MB" -f ((Get-Item dist\10Phases.exe).Length / 1MB)
 
+      - name: Check self-updating works with the real exe
+        run: python tools/check_update.py
+
       - uses: actions/upload-artifact@v4
         with:
           name: 10Phases-windows
@@ -56,6 +59,7 @@ jobs:
         run: |
           ver=$(python -c "import ten_phases; print(ten_phases.__version__)")
           echo "tag=v$ver" >> "$GITHUB_OUTPUT"
+          python tools/release_notes.py "$ver" > release_notes.md
           if gh release view "v$ver" > /dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
@@ -63,6 +67,7 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ github.token }}
+          PYTHONIOENCODING: utf-8
 
       # A new version number on master (or a pushed v* tag) publishes a Release with the exe.
       - name: Publish release
@@ -73,9 +78,4 @@ jobs:
           name: 10 Phases ${{ steps.version.outputs.tag }}
           target_commitish: ${{ github.sha }}
           files: dist/10Phases.exe
-          body: |
-            **Download `10Phases.exe` below and double-click it.** No install or Python needed.
-
-            Windows may show "Windows protected your PC" because the exe isn't code-signed:
-            click **More info** then **Run anyway**. The first time you host a multiplayer game,
-            allow it through the firewall on private networks so friends can connect.
+          body_path: release_notes.md

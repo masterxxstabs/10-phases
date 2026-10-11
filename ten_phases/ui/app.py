@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import os
+import sys
+
 import pygame
 
+from .. import updater
 from ..settings import Settings
 from . import sfx, theme
 
 
 class App:
-    def __init__(self):
+    def __init__(self, check_updates: bool = True):
         pygame.mixer.pre_init(sfx.RATE, -16, 1, 512)
         pygame.init()
         pygame.display.set_caption("10 Phases")
@@ -24,6 +28,9 @@ class App:
         self.settings = Settings.load()
         sfx.init(self.settings.sfx)
         theme.apply(self.settings)
+        self.updater = updater.Updater()
+        if check_updates and self.settings.auto_update:
+            self.updater.start()
         self.running = True
         from .menus import MenuScene
         self.scene = MenuScene(self)
@@ -33,6 +40,17 @@ class App:
 
     def quit(self) -> None:
         self.running = False
+
+    def restart_for_update(self) -> None:
+        """Install the downloaded update, start the new version and close this one."""
+        if self.updater.apply(restart=True):
+            self.running = False
+
+    def finish(self) -> None:
+        """On exit: a downloaded update that wasn't installed yet goes in now, for next time."""
+        if self.updater.state == "ready":
+            self.updater.apply(restart=False)
+        pygame.quit()
 
     def run(self, max_frames: int | None = None) -> None:
         frames = 0
@@ -51,23 +69,44 @@ class App:
             pygame.display.flip()
 
 
+def _arg_value(flag: str, default: int) -> int:
+    if flag in sys.argv:
+        try:
+            return int(sys.argv[sys.argv.index(flag) + 1])
+        except (IndexError, ValueError):
+            pass
+    return default
+
+
 def smoke_test() -> None:
-    """Start the app, open a game, render some frames and exit. Used to check packaged builds."""
+    """Start the app, open a game, render some frames and exit. Used to check packaged builds.
+
+    --smoke-frames N keeps the game open longer; TEN_PHASES_SMOKE_MARKER=path writes "ok" there at the end.
+    """
     from .game_scene import GameScene
 
-    app = App()
+    app = App(check_updates=False)
     app.run(max_frames=30)
     app.running = True
     app.go(GameScene(app))
-    app.run(max_frames=120)
+    app.run(max_frames=_arg_value("--smoke-frames", 120))
     pygame.quit()
+    marker = os.environ.get("TEN_PHASES_SMOKE_MARKER")
+    if marker:
+        with open(marker, "w") as f:
+            f.write("ok")
 
 
 def main() -> None:
-    import sys
-
     if "--smoke-test" in sys.argv:
         smoke_test()
         return
-    App().run()
-    pygame.quit()
+    if "--relaunch-test" in sys.argv:
+        # Packaging check: start a fresh copy of ourselves the way an update restart does, then quit.
+        exe = updater.running_exe()
+        if exe is not None:
+            updater.relaunch(exe, ["--smoke-test"])
+        return
+    app = App()
+    app.run()
+    app.finish()

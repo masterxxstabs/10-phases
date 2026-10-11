@@ -5,6 +5,7 @@ from __future__ import annotations
 import queue
 import threading
 
+from .. import __version__
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
 from .snapshot import RemoteGame
 
@@ -39,7 +40,7 @@ class ClientSession:
             return
         self.conn = conn
         self.status = "waiting"
-        conn.send({"t": "hello", "v": VERSION, "key": self.key, "name": self.name})
+        conn.send({"t": "hello", "v": VERSION, "app": __version__, "key": self.key, "name": self.name})
 
     def send(self, msg: dict):
         if self.conn:

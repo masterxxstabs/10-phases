@@ -11,6 +11,7 @@ import random
 import socket
 import threading
 
+from .. import __version__
 from ..ai import AIPlayer
 from ..game import Game, Player, RuleError
 from .discovery import Beacon
@@ -68,7 +69,7 @@ class HostServer:
     def _beacon_info(self):
         if self.in_game or not self.running or self.seats_free() <= 0:
             return None
-        return {"name": self.name, "ip": self.address, "port": self.port, "key": self.key,
+        return {"name": self.name, "app": __version__, "ip": self.address, "port": self.port, "key": self.key,
                 "players": 1 + len(self.guests), "max": MAX_PLAYERS}
 
     # ---------------------------------------------------------------- invite
@@ -155,7 +156,9 @@ class HostServer:
             conn.send({"t": "reject", "reason": reason})
             conn.close()
         if msg.get("v") != VERSION:
-            return reject("That game is running a different version of 10 Phases.")
+            theirs = f"v{msg['app']}" if isinstance(msg.get("app"), str) else "an older version"
+            return reject(f"Version mismatch: the host has v{__version__}, you have {theirs}. "
+                          "Both players need the latest version.")
         if msg.get("key") != self.key:
             return reject("That invite code is out of date. Ask the host for a new one.")
         if self.in_game:

@@ -25,6 +25,7 @@ class Settings:
     sort_by: str = "number"
     sfx: str = "Medium"
     player_name: str = "PLAYER"
+    auto_update: bool = True
     # Look
     table_color: str = DEFAULT_TABLE
     accent: str = "Yellow"

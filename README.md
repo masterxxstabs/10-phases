@@ -17,6 +17,27 @@ Get **`10Phases.exe`** from the [Releases page](../../releases/latest) and doubl
 - **Firewall prompt the first time you host:** allow it on private networks so friends can connect.
 - **Startup:** the game unpacks itself for a couple of seconds when it starts.
 
+## Updates
+
+The game keeps itself up to date:
+
+1. When it starts, it checks this repo's latest GitHub Release. Your version is shown in the bottom-left corner of the main menu and in Settings.
+2. If there's a newer `10Phases.exe`, it downloads in the background. The game checks the file's size, its SHA-256 checksum (as reported by GitHub) and that it's a Windows program.
+3. The menu shows **UPDATE READY!** with what's new:
+   - **RESTART NOW** installs the update and reopens the game.
+   - **LATER** installs it when you quit, so your next launch is the new version.
+
+To update, the game renames the running `10Phases.exe` to `10Phases.exe.old` (Windows allows renaming a running program, just not overwriting it) and moves the new file into its place. Leftover files are cleaned up on the next start. If the exe sits in a folder the game can't write to, or you run from source, the menu links to the download instead.
+
+You can turn this off with **Settings → Updates → Off**. In multiplayer, if you and the host are on different versions, the game tells you which ones.
+
+**Publishing an update:** bump `__version__` in `ten_phases/__init__.py`, add a section to `CHANGELOG.md`, and push to `master`. GitHub Actions then does the rest:
+- tests and builds the exe on Windows
+- checks that the exe starts, and that swapping and restarting it works
+- publishes a Release whose notes come from the changelog
+
+Everyone's game picks the update up the next time it opens.
+
 ## Build the exe yourself
 
 GitHub Actions builds `10Phases.exe` on Windows for every push to `master`; you can download it from the run's **Artifacts**. When the version in `ten_phases/__init__.py` hasn't been released yet, the workflow also tags the commit and publishes a Release with the exe, so to put out an update you just bump the version. To build locally:
@@ -158,7 +179,9 @@ ten_phases/
   game.py       rules engine (turns, laying down, hitting, skips, scoring)
   ai.py         computer players and difficulty profiles
   settings.py   persisted settings
-tools/          make_icon.py (app icon from the card art), build.py (PyInstaller one-file build)
+  updater.py    checks GitHub Releases, downloads, verifies and installs new versions
+tools/          make_icon.py (app icon), build.py (PyInstaller one-file build),
+                check_update.py (self-update check on the real exe), release_notes.py (from CHANGELOG.md)
 .github/        workflow that builds and publishes the Windows exe
   net/          multiplayer: invite codes and connections (protocol.py), LAN discovery,
                 host lobby and game session (host.py), guest connection (client.py),

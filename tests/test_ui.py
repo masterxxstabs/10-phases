@@ -22,7 +22,7 @@ def app(tmp_path_factory):
 
     original = settings_module.SETTINGS_PATH
     settings_module.SETTINGS_PATH = tmp_path_factory.mktemp("cfg") / "settings.json"
-    yield App()
+    yield App(check_updates=False)
     settings_module.SETTINGS_PATH = original
 
 
@@ -94,3 +94,24 @@ def test_look_settings_round_trip_and_bad_values(tmp_path):
     path.write_text('{"table_color": "blue", "text_style": "Comic"}')
     bad = Settings.load(path)
     assert bad.table_color == Settings().table_color and bad.text_style == "Pixel"
+
+
+def test_menu_shows_version_and_each_update_state(app):
+    from ten_phases import __version__
+    from ten_phases.ui.menus import MenuScene
+    from ten_phases.updater import UpdateInfo
+
+    menu = MenuScene(app)
+    up = app.updater
+    up.info = UpdateInfo("9.9.9", "v9.9.9", ["Shiny new things", "Fixes"], "https://github.com", None, 1, None)
+    for state in ("checking", "current", "failed", "downloading", "ready", "available"):
+        up.state = state
+        up.progress = 0.4
+        menu.draw(app.screen)
+        assert menu.btn_restart.visible == (state == "ready")
+        assert menu.btn_get.visible == (state == "available")
+    menu._later()
+    menu.draw(app.screen)
+    assert not menu.btn_restart.visible
+    assert __version__
+    up.state, up.info, up.dismissed = "idle", None, False
