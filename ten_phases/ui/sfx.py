@@ -168,5 +168,8 @@ def play(name: str) -> None:
         return
     snd = _sounds.get(name)
     if snd is not None:
-        snd.set_volume(_volume)
-        snd.play()
+        try:
+            snd.set_volume(_volume)
+            snd.play()
+        except pygame.error:
+            pass  # audio device went away; carry on silently

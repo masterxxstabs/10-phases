@@ -9,7 +9,27 @@ The look is inspired by handheld card games like UNO 52 on the Nintendo DS:
 - pixel lettering and a black status bar
 - bright cards with a white border and a tilted oval
 
-## Run it
+## Download (Windows)
+
+Get **`10Phases.exe`** from the [Releases page](../../releases/latest) and double-click it. It's a single file, so there's nothing to install and no Python needed. Share the same file with friends for multiplayer.
+
+- **"Windows protected your PC":** the exe isn't code-signed, so Windows shows this warning. Click **More info**, then **Run anyway**.
+- **Firewall prompt the first time you host:** allow it on private networks so friends can connect.
+- **Startup:** the game unpacks itself for a couple of seconds when it starts.
+
+## Build the exe yourself
+
+GitHub Actions builds `10Phases.exe` on Windows for every push to `master` (download it from the run's **Artifacts**). Pushing a tag such as `v1.0.1` also publishes the exe on a Release. To build locally:
+
+```bash
+pip install -r requirements.txt pyinstaller pillow
+python tools/build.py        # -> dist/10Phases.exe on Windows (dist/10Phases on macOS/Linux)
+dist/10Phases.exe --smoke-test   # opens the game briefly and exits; exit code 0 means OK
+```
+
+Builds are per-OS, so build on Windows to get a Windows exe. The version number lives in `ten_phases/__init__.py`.
+
+## Run from source
 
 ```bash
 pip install -r requirements.txt
@@ -138,6 +158,8 @@ ten_phases/
   game.py       rules engine (turns, laying down, hitting, skips, scoring)
   ai.py         computer players and difficulty profiles
   settings.py   persisted settings
+tools/          make_icon.py (app icon from the card art), build.py (PyInstaller one-file build)
+.github/        workflow that builds and publishes the Windows exe
   net/          multiplayer: invite codes and connections (protocol.py), LAN discovery,
                 host lobby and game session (host.py), guest connection (client.py),
                 per-player views and the guest's mirror of the game (snapshot.py)

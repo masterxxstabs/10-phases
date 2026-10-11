@@ -188,3 +188,20 @@ def preview_sheet(path: str) -> None:
     for i, c in enumerate(cards):
         sheet.blit(render_card(c, w, h), (10 + i * (w + 10), 10))
     pygame.image.save(sheet, path)
+
+
+def app_icon(size: int = 256) -> pygame.Surface:
+    """The app/window icon: a tilted card back on a rounded blue tile."""
+    surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    radius = size // 5
+    pygame.draw.rect(surf, (14, 52, 132), surf.get_rect().move(0, size // 40), border_radius=radius)
+    pygame.draw.rect(surf, (30, 112, 226), surf.get_rect().inflate(0, -size // 40).move(0, -size // 80),
+                     border_radius=radius)
+    for k, (dx, angle) in enumerate(((-0.13, 14), (0.06, -8))):
+        card = render_card(None, int(size * 0.5), int(size * 0.75))
+        if k == 0:
+            card = card.copy()
+            card.fill((255, 255, 255, 140), special_flags=pygame.BLEND_RGBA_MULT)
+        card = pygame.transform.rotozoom(card, angle, 1)
+        surf.blit(card, card.get_rect(center=(size // 2 + int(dx * size), size // 2)))
+    return surf
