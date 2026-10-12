@@ -474,7 +474,9 @@ def test_harder_computers_win_more():
         rng.shuffle(levels)
         g = MonopolyGame([MPlayer(f"P{k}", difficulty=d) for k, d in enumerate(levels)], random.Random(seed))
         ais = [MonopolyAI(d, random.Random(seed * 10 + k)) for k, d in enumerate(levels)]
-        while not g.game_over:
+        for _ in range(100000):
+            if g.game_over:
+                break
             me = g.actor()
             action, kw = ais[me].choose(g, me)
             g.act(me, action, **kw)
@@ -514,7 +516,8 @@ def test_full_monopoly_game_over_localhost():
         assert all(type(c.game).__name__ == "RemoteMonopolyGame" for c in guests)
         host_ai = MonopolyAI("Hard", random.Random(1))
         guest_ai = [MonopolyAI("Hard", random.Random(2 + k)) for k in range(2)]
-        for _ in range(400000):
+        deadline = time.monotonic() + 240
+        while time.monotonic() < deadline:
             pump_all()
             if game.game_over:
                 break
@@ -526,7 +529,7 @@ def test_full_monopoly_game_over_localhost():
                 continue
             rg = guests[seat - 1].game
             if rg.pending or rg.actor() != 0 or rg.round != game.round:
-                time.sleep(0.0005)
+                time.sleep(0.001)
                 continue
             action, kw = guest_ai[seat - 1].choose(rg, 0)
             try:

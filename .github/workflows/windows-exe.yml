@@ -33,7 +33,8 @@ jobs:
           pip install -r requirements.txt pyinstaller pillow pytest
 
       - name: Run tests
-        run: python -m pytest -q
+        timeout-minutes: 20
+        run: python -m pytest -q --durations=15 -o faulthandler_timeout=300
 
       - name: Build exe
         run: python tools/build.py

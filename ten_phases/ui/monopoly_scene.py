@@ -958,9 +958,13 @@ class MonopolyScene(Scene):
                     if not self.queue:
                         break
                     self.cur = self._start(self.queue.pop(0))
-                use = min(budget, max(0.0, self.cur.dur - self.cur.t))
-                self.cur.t += use
-                budget -= use
+                left = max(0.0, self.cur.dur - self.cur.t)
+                if budget >= left:
+                    self.cur.t = self.cur.dur      # exactly, so rounding can never leave it a hair short
+                    budget -= left
+                else:
+                    self.cur.t += budget
+                    budget = 0.0
                 self._tick(self.cur)
                 if self.cur.t >= self.cur.dur:
                     self._finish(self.cur)
