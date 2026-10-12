@@ -156,11 +156,16 @@ class Game:
 
     # ------------------------------------------------------------------ actions
 
-    def draw_from_deck(self, player_index: int) -> Card:
+    def draw_from_deck(self, player_index: int) -> Card | None:
         self._require_turn(player_index)
         if self.has_drawn:
             raise RuleError("You already drew this turn.")
         if not self.deck.cards:
+            if len(self.discard_pile) <= 1:
+                # Every card is in a hand or on the table, so there's nothing left to draw: the
+                # round ends where it stands (very rare - it takes huge hands and a long round).
+                self._end_round(player_index)
+                return None
             self._reshuffle()
         card = self.deck.draw()
         self.player.hand.append(card)
@@ -185,9 +190,9 @@ class Game:
         return top
 
     def _reshuffle(self) -> None:
-        top = self.discard_pile.pop()
-        if not self.discard_pile:
+        if len(self.discard_pile) <= 1:
             raise RuleError("No cards left to draw.")
+        top = self.discard_pile.pop()
         self.deck.refill(self.discard_pile)
         self.discard_pile = [top]
         self._emit(Event("reshuffle"))

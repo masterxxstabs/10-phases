@@ -263,3 +263,52 @@ def test_full_blackjack_game_over_localhost():
             assert c.game.players[0].chips == game.players[seat].chips
     finally:
         server.close()
+
+
+@pytest.mark.parametrize("game_name", ["10 PHASES", "GO FISH", "BLACKJACK"])
+def test_everyone_sees_everyone_elses_skins(game_name):
+    server = HostServer("HOSTY", port=0, announce=False, game=game_name, skin=("neon", "galaxy"))
+    try:
+        guests = [ClientSession("ANA", "127.0.0.1", server.port, server.key, skin=("koi", "f003")),
+                  ClientSession("BO", "127.0.0.1", server.port, server.key, skin=("not-a-skin", 7))]
+
+        def pump_all():
+            server.pump()
+            for c in guests:
+                c.poll()
+        assert wait_for(lambda: all(c.status == "joined" and len(c.members) == 3 for c in guests), pump_all)
+        server.set_ai_count(1)
+        session = server.start_game(0)
+        assert wait_for(lambda: all(c.game and c.game.players for c in guests), pump_all)
+        real = {p.name: tuple(p.skin) for p in session.game.players}
+        assert real["HOSTY"] == ("neon", "galaxy")
+        assert real["ANA"] == ("koi", "f003")
+        assert real["BO"] == ("classic", "classic")      # junk from the wire is cleaned up
+        for c in guests:
+            seen = {p.name: tuple(p.skin) for p in c.game.players}
+            assert seen == real                          # including the computer's random pick
+    finally:
+        server.close()
+
+
+def test_malformed_moves_never_crash_the_host():
+    server = HostServer("H", port=0, announce=False)
+    try:
+        guest = ClientSession("G", "127.0.0.1", server.port, server.key)
+
+        def pump_all():
+            server.pump()
+            guest.poll()
+        assert wait_for(lambda: guest.status == "joined", pump_all)
+        session = server.start_game(0)
+        assert wait_for(lambda: guest.game and guest.game.players, pump_all)
+        session.game.current = 1   # the guest's turn
+        bad = [{"a": "lay", "cards": 5}, {"a": "hit", "card": [1]}, {"a": "discard", "card": {"x": 1}},
+               {"a": "hit", "card": 3, "meld": "x"}, {"a": 42}, {"a": "lay", "cards": [None, "x"]}]
+        for msg in bad:
+            guest.send({"t": "act", **msg})
+        errors = []
+        assert wait_for(lambda: len(errors) >= len(bad),
+                        lambda: (server.pump(), errors.extend(m for m in guest.poll() if m["t"] == "error")))
+    finally:
+        server.close()

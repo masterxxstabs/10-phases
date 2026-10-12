@@ -140,15 +140,20 @@ Hovering a seat shows that player's chips, net for the game, current hands and r
 
 ## Card Shop
 
-The **SHOP** button under your Chip Bank opens the shop. Spend chips on card skins:
+The **SHOP** button under your Chip Bank opens the shop. Spend chips on card packs, then equip the skins you find:
 
-| | Skins (price in chips) |
-|---|---|
-| **Card fronts** | Classic (free), Bubble 60, Diamond 90, Minimal 120, Neon 250, Gold 400 |
-| **Card backs** | Classic (free), Checker 50, Racing Stripes 75, Starry Night 150, Neon Glow 200, Galaxy 300, Gold Edition 500 |
+| Pack | Price | What's inside |
+|---|---|---|
+| **Basic** | 75 | 3 skins, anything can happen |
+| **Premium** | 200 | 3 skins, the last one Rare or better |
+| **Legendary** | 500 | 3 skins, the last one Epic or better |
 
-- Every item shows a live preview. Buying takes a confirm click, and owned skins can be equipped any time.
-- Skins are cosmetic and only change your own screen. They work in every game, and the card backs use your Customize card-back color.
+- Open a pack by swiping across the top to rip it (or tap it / press SPACE), then flip the cards one at a time. Rare cards glow before you flip them.
+- Skins come in Common, Rare, Epic and Legendary. The shop shows each pack's odds.
+- Duplicates pay back chips: 10 / 25 / 60 / 150 by rarity.
+- Free for everyone, and never in packs: Classic, Bubble and Minimal fronts; Classic, Checker and Racing Stripes backs.
+- There are almost 300 skins: hand-made ones like Neon, Holo Foil and the Koi Pond set, plus a big generated collection with lots of foil finishes. CARD FRONTS and CARD BACKS show your collection page by page.
+- Skins work in every game and in multiplayer: other players see your fronts on the cards you play and your backs on the cards in your hand. Computer players get random skins.
 
 ## Slots
 
@@ -248,7 +253,8 @@ ten_phases/
   gofish/       Go Fish rules (engine.py) and computer players (ai.py)
   blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
-  shop.py       card shop catalog, buying and equipping skins
+  skins.py      every card skin and its rarity, including the generated ones
+  shop.py       card packs (odds, opening, duplicates) and equipping skins
   names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions

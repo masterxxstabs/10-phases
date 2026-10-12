@@ -188,6 +188,13 @@ _logo_cache: dict[tuple, pygame.Surface] = {}
 
 def logo(surf, msg: str, center, size: int = 64, angle: float = 8, color="ACCENT", edge="OUTLINE") -> pygame.Rect:
     """A tilted, thick-outlined wordmark like a handheld game logo."""
+    img = logo_surface(msg, size, angle, color, edge)
+    rect = img.get_rect(center=center)
+    surf.blit(img, rect)
+    return rect
+
+
+def logo_surface(msg: str, size: int = 64, angle: float = 8, color="ACCENT", edge="OUTLINE") -> pygame.Surface:
     color, edge = resolve(color), resolve(edge)
     key = (msg, size, angle, color, edge)
     img = _logo_cache.get(key)
@@ -203,9 +210,7 @@ def logo(surf, msg: str, center, size: int = 64, angle: float = 8, color="ACCENT
         outer.blit(inner, (pad, pad))
         img = pygame.transform.rotozoom(outer, angle, 1)
         _logo_cache[key] = img
-    rect = img.get_rect(center=center)
-    surf.blit(img, rect)
-    return rect
+    return img
 
 
 # --------------------------------------------------------------------------- shapes

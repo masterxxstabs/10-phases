@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import math
+import os
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
@@ -55,10 +57,21 @@ class Settings:
         path = path or SETTINGS_PATH
         try:
             data = json.loads(path.read_text())
+            if not isinstance(data, dict):
+                return cls()
             known = {f.name for f in fields(cls)}
             s = cls(**{k: v for k, v in data.items() if k in known})
         except (OSError, ValueError, TypeError):
             return cls()
+        # Anything of the wrong type (a hand-edited or damaged file) goes back to its default.
+        defaults = cls()
+        for f in fields(cls):
+            want = type(getattr(defaults, f.name))
+            value = getattr(s, f.name)
+            if want is int and isinstance(value, float) and math.isfinite(value) and abs(value) < 1e12:
+                setattr(s, f.name, int(value))
+            elif not isinstance(value, want) or (want is int and isinstance(value, bool)):
+                setattr(s, f.name, getattr(defaults, f.name))
         if s.difficulty not in DIFFICULTY_CHOICES:
             s.difficulty = "Medium"
         if s.ai_speed not in SPEED_CHOICES:
@@ -67,24 +80,32 @@ class Settings:
             s.sfx = "Medium"
         if s.text_style not in TEXT_STYLES:
             s.text_style = "Pixel"
-        if not (isinstance(s.table_color, str) and len(s.table_color) == 7 and s.table_color.startswith("#")):
+        try:
+            if len(s.table_color) != 7 or not s.table_color.startswith("#"):
+                raise ValueError
+            int(s.table_color[1:], 16)
+        except ValueError:
             s.table_color = DEFAULT_TABLE
-        from .shop import BY_ID
+        s.player_name = s.player_name[:24]
+        from .skins import BY_ID, FREE_IDS
         if not isinstance(s.owned_items, list):
             s.owned_items = []
-        s.owned_items = sorted({i for i in s.owned_items if i in BY_ID} | {"face:classic", "back:classic"})
+        s.owned_items = sorted({i for i in s.owned_items if isinstance(i, str) and i in BY_ID} | set(FREE_IDS))
         for attr, kind in (("face_style", "face"), ("back_style", "back")):
             if f"{kind}:{getattr(s, attr)}" not in s.owned_items:
                 setattr(s, attr, "classic")
         if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "SLOTS"):
             s.game = "10 PHASES"
-        s.opponents = max(1, min(5, int(s.opponents)))
-        s.chip_bank = max(0, int(s.chip_bank)) if isinstance(s.chip_bank, (int, float)) else 0
+        s.opponents = max(1, min(5, s.opponents))
+        s.chip_bank = max(0, s.chip_bank)
         return s
 
     def save(self, path: Path | None = None) -> None:
         path = path or SETTINGS_PATH
+        # Write a temp file and swap it in, so a crash mid-save can't wipe the Chip Bank.
+        tmp = path.with_name(path.name + ".tmp")
         try:
-            path.write_text(json.dumps(asdict(self), indent=2))
+            tmp.write_text(json.dumps(asdict(self), indent=2))
+            os.replace(tmp, path)
         except OSError:
             pass

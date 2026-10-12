@@ -4,6 +4,15 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.7.0
+
+- Card packs! Skins now come from Basic, Premium and Legendary packs that you rip open with a swipe
+- Flip your cards one by one: rare cards glow before you flip them, and legendaries get the full show
+- Almost 300 skins: new hand-made ones (including the Koi Pond set), plus a huge generated collection with lots of foil finishes
+- Duplicates turn back into chips, and Classic, Bubble, Minimal, Checker and Racing Stripes are free for everyone
+- Your skins show up for everyone in multiplayer (everyone needs this version to play together)
+- Bug fixes: the host can't be crashed by bad network messages, damaged settings files no longer stop the game, slot wins are kept if you close mid-spin, and more
+
 ## 1.6.0
 
 - New Card Shop: spend your Chip Bank on card skins (6 card fronts, 7 card backs) from the SHOP button

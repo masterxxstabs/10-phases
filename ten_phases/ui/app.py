@@ -100,9 +100,13 @@ def smoke_test() -> None:
     app.running = True
     app.go(BlackjackScene(app))
     app.run(max_frames=90)
+    from .. import shop
+    from .pack_open import PackOpenScene
     from .shop_scene import ShopScene
     from .slots_scene import SlotsScene
-    for scene in (ShopScene(app), SlotsScene(app)):
+    pulls = shop.open_pack(shop.PACK_BY_ID["legendary"], set())   # just for show: nothing is saved
+    for scene in (ShopScene(app), ShopScene(app, tab="CARD BACKS"), SlotsScene(app),
+                  PackOpenScene(app, "legendary", pulls)):
         app.running = True
         app.go(scene)
         app.run(max_frames=30)

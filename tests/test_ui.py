@@ -238,3 +238,113 @@ def test_slots_bank_accounting_through_the_screen(app):
     scene.spin()
     assert scene.spinning is None              # can't spin with no chips
     app.settings.game = "10 PHASES"
+
+
+def _drive(app, frames=1, dt=1 / 60):
+    for _ in range(frames):
+        app.scene.update(dt)
+        app.scene.draw(app.screen)
+
+
+def test_pack_opening_from_swipe_to_summary(app):
+    from ten_phases import shop
+    from ten_phases.ui.pack_open import PackOpenScene
+    from ten_phases.ui.shop_scene import ShopScene
+
+    app.settings.chip_bank = 2000
+    app.go(ShopScene(app))
+    shop_scene = app.scene
+    btn = shop_scene.pack_buttons["legendary"]
+    for _ in range(2):   # tap twice: confirm, then buy
+        app.scene.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=btn.rect.center, button=1))
+        app.scene.handle(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=btn.rect.center, button=1))
+    scene = app.scene
+    assert isinstance(scene, PackOpenScene) and app.settings.chip_bank <= 2000 - 500 + 450
+    _drive(app, 60)
+    assert scene.state == "ready"
+    r = scene.pack_rect()
+    y = r.y + 66
+    scene.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(r.x, y), button=1))
+    x = r.x
+    while scene.state == "tearing" and x < r.right + 400:
+        x += 20
+        scene.handle(pygame.event.Event(pygame.MOUSEMOTION, pos=(x, y), rel=(20, 0), buttons=(1, 0, 0)))
+        _drive(app)
+    assert scene.state == "burst"
+    _drive(app, 120)
+    assert scene.state == "reveal"
+    for _ in range(40):   # keep tapping: flips every card and dismisses the legendary close-up
+        scene.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0, unicode=" "))
+        scene.handle(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=(5, 5), button=1))
+        _drive(app, 30)
+        if scene.state == "done":
+            break
+    assert scene.state == "done" and all(s.revealed for s in scene.slots)
+    owned = set(app.settings.owned_items)
+    assert all(s.skin.id in owned for s in scene.slots)
+    scene._equip(scene.slots[-1])
+    assert shop.equipped(app.settings, scene.slots[-1].skin)
+    scene._again()
+    assert isinstance(app.scene, PackOpenScene) and app.scene is not scene
+    app.scene._skip()
+    _drive(app, 5)
+    assert app.scene.state == "done"
+
+
+def test_shop_collection_pages(app):
+    from ten_phases.ui.shop_scene import ShopScene
+
+    app.go(ShopScene(app, tab="CARD BACKS"))
+    s = app.scene
+    assert s.pages() > 5
+    seen = set()
+    for _ in range(s.pages()):
+        seen |= {sk.id for sk in s.skins()}
+        _drive(app)
+        s._turn(1)
+    assert len(seen) == len(s.all_skins()) and s.page == 0
+    s._toggle_owned()
+    assert all(sk.id in app.settings.owned_items or sk.free for sk in s.all_skins())
+    _drive(app)
+
+
+def test_random_clicking_never_crashes_any_screen(app):
+    """Mash the mouse and keyboard on every screen (without leaving it) and keep drawing."""
+    import random
+
+    from ten_phases.ui.blackjack_scene import BlackjackScene
+    from ten_phases.ui.customize import CustomizeScene
+    from ten_phases.ui.gofish_scene import GoFishScene
+    from ten_phases.ui.menus import HowToScene, MenuScene, SettingsScene
+    from ten_phases.ui.pack_open import PackOpenScene
+    from ten_phases.ui.shop_scene import ShopScene
+    from ten_phases.ui.slots_scene import SlotsScene
+    from ten_phases import shop
+
+    rng = random.Random(5)
+    makers = [lambda: GameScene(app), lambda: GoFishScene(app), lambda: BlackjackScene(app), lambda: SlotsScene(app),
+              lambda: ShopScene(app), lambda: ShopScene(app, tab="CARD FRONTS"), lambda: MenuScene(app),
+              lambda: SettingsScene(app), lambda: CustomizeScene(app), lambda: HowToScene(app, "GO FISH"),
+              lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng))]
+    keys = [pygame.K_SPACE, pygame.K_RETURN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_1]
+    for make in makers:
+        app.settings.chip_bank = 1000
+        scene = make()
+        app.go(scene)
+        for _ in range(250):
+            if app.scene is not scene:   # a click left the screen: come back to it
+                app.go(scene)
+            pos = (rng.randrange(1280), rng.randrange(800))
+            kind = rng.random()
+            if kind < 0.4:
+                scene.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=pos, button=rng.choice([1, 1, 3])))
+                scene.handle(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=pos, button=1))
+            elif kind < 0.7:
+                scene.handle(pygame.event.Event(pygame.MOUSEMOTION, pos=pos, rel=(rng.randint(-40, 40), 0),
+                                                buttons=(1, 0, 0)))
+            elif kind < 0.8:
+                scene.handle(pygame.event.Event(pygame.MOUSEWHEEL, x=0, y=rng.choice([-1, 1])))
+            else:
+                scene.handle(pygame.event.Event(pygame.KEYDOWN, key=rng.choice(keys), mod=0, unicode=""))
+            scene.update(rng.choice([0.0, 1 / 60, 0.1]))
+            scene.draw(app.screen)

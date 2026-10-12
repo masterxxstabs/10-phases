@@ -123,3 +123,17 @@ def test_pot_goes_to_player_who_goes_out():
     g.discard(i, p.hand[0])
     assert g.round_over and g.pot == 0
     assert p.chips == 26 and g.round_chips[i] == 2
+
+
+def test_running_out_of_cards_ends_the_round_instead_of_losing_one():
+    from ten_phases.game import Game, Player
+    g = Game([Player("A", is_human=True), Player("B")])
+    total = len(g.deck.cards) + len(g.discard_pile) + sum(len(p.hand) for p in g.players)
+    # Pile every spare card into the first player's hand.
+    g.players[0].hand += g.deck.cards + g.discard_pile[:-1]
+    g.deck.cards = []
+    g.discard_pile = g.discard_pile[-1:]
+    g.current = 0
+    assert g.draw_from_deck(0) is None
+    assert g.round_over
+    assert len(g.deck.cards) + len(g.discard_pile) + sum(len(p.hand) for p in g.players) == total

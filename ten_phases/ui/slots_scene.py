@@ -93,6 +93,7 @@ class SlotsScene(Scene):
         self.reel_len = n
         self.spinning: list[dict] | None = None   # per reel: start, target, t, duration
         self.result = None
+        self.unseen_win = 0
         self.bet = 5 if app.settings.chip_bank >= 5 else 1
         self.win_flash = 0.0
         self.coins: list[list[float]] = []
@@ -111,7 +112,8 @@ class SlotsScene(Scene):
 
     @property
     def bank(self) -> int:
-        return self.app.settings.chip_bank
+        """What the player sees: a win only shows up once the reels stop."""
+        return self.app.settings.chip_bank - self.unseen_win
 
     def _set_bet(self, v: str):
         self.bet = int(v)
@@ -133,9 +135,11 @@ class SlotsScene(Scene):
                 self.last = "Out of chips! Win more in 10 Phases, Go Fish or Blackjack."
             return
         s = self.app.settings
-        s.chip_bank -= self.bet
-        s.save()
         self.result = self.machine.spin(self.bet)
+        # Settle the spin straight away, so closing the window mid-spin can't lose a win.
+        s.chip_bank += self.result.win - self.bet
+        s.save()
+        self.unseen_win = self.result.win
         self.spinning = []
         for k in range(3):
             start = self.pos[k]
@@ -150,9 +154,7 @@ class SlotsScene(Scene):
     def _finish_spin(self):
         r = self.result
         self.spinning = None
-        s = self.app.settings
-        s.chip_bank += r.win
-        s.save()
+        self.unseen_win = 0
         self.session_net += r.win - r.bet
         if r.win:
             self.win_flash = 2.5

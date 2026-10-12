@@ -17,6 +17,7 @@ from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, backdrop, status_bar
 from .widgets import Button
@@ -59,6 +60,7 @@ class BlackjackScene(Scene):
             players = [BJPlayer("YOU", is_human=True)] + [BJPlayer(n, difficulty=d) for n, d in zip(names, diffs)]
             self.game = BlackjackGame(players)
             self.ais = {i + 1: BlackjackAI(d) for i, d in enumerate(diffs)}
+        self.skins = TableSkins(self)
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.bet_amount = 5
         self.anims: list[FlyingCard] = []
@@ -185,13 +187,15 @@ class BlackjackScene(Scene):
                     idx = n - 1 if k == "dealer_hit" else (1 if ev.hidden else 0)
                     end = self.dealer_card_rect(min(idx, n - 1), n)
                     card = None if ev.hidden else ev.card
+                    face = None
                 else:
                     hand = g.players[ev.player].hands[ev.hand] if ev.hand < len(g.players[ev.player].hands) else None
                     idx = (hand.cards.index(ev.card) if hand and ev.card in hand.cards else 0)
                     end = self.card_rect(ev.player, ev.hand, idx)
                     card = ev.card
+                    face = self.skins.face(ev.player)
                 self.anims.append(FlyingCard(card, self.shoe_rect(), end, 0.3, stagger,
-                                             hide_id=card.id if card is not None else None))
+                                             hide_id=card.id if card is not None else None, face=face))
                 stagger += 0.12 if k == "deal" else 0.0
                 sfx.play("draw")
                 if k == "double":
@@ -202,7 +206,9 @@ class BlackjackScene(Scene):
                 self.bubble(ev.player, f"BET {ev.amount}", theme.TEXT)
                 sfx.play("coin" if ev.player == HUMAN else "click")
             elif k == "stand":
-                self.bubble(ev.player, f"STAND ON {g.players[ev.player].hands[ev.hand].value}", theme.TEXT)
+                hands = g.players[ev.player].hands if ev.player is not None and ev.player < len(g.players) else []
+                if ev.hand < len(hands):   # a late event can describe a hand that's already been cleared
+                    self.bubble(ev.player, f"STAND ON {hands[ev.hand].value}", theme.TEXT)
             elif k == "bust":
                 self.bubble(ev.player, "BUST!", theme.DANGER)
                 sfx.play("skip")
@@ -566,7 +572,7 @@ class BlackjackScene(Scene):
                 cr = self.card_rect(i, h, k)
                 if c.id in hidden:
                     continue
-                img, _ = card_with_shadow(c, cr.w, cr.h)
+                img, _ = card_with_shadow(c, cr.w, cr.h, face=self.skins.face(i))
                 surf.blit(img, cr)
             first = self.card_rect(i, h, 0)
             self._total_badge(surf, hand.cards, (first.x, first.y - 26), 13)

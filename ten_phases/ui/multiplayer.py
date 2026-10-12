@@ -76,6 +76,9 @@ class MultiplayerScene(Scene):
         self.app.settings.save()
         return name
 
+    def _skin(self) -> tuple[str, str]:
+        return self.app.settings.face_style, self.app.settings.back_style
+
     def _leave(self):
         self.browser.stop()
 
@@ -86,7 +89,7 @@ class MultiplayerScene(Scene):
 
     def _host(self):
         try:
-            server = HostServer(self._player_name(), game=self.app.settings.game)
+            server = HostServer(self._player_name(), game=self.app.settings.game, skin=self._skin())
         except NetError as e:
             sfx.play("error")
             self.flash.show(str(e))
@@ -109,7 +112,7 @@ class MultiplayerScene(Scene):
             self.flash.show("Enter the invite code from the host.")
             return
         try:
-            client = ClientSession.from_code(self._player_name(), self.code.value)
+            client = ClientSession.from_code(self._player_name(), self.code.value, self._skin())
         except NetError as e:
             sfx.play("error")
             self.flash.show(str(e))
@@ -119,7 +122,7 @@ class MultiplayerScene(Scene):
 
     def _join_nearby(self, game: dict):
         self._leave()
-        client = ClientSession(self._player_name(), game["ip"], game["port"], game["key"])
+        client = ClientSession(self._player_name(), game["ip"], game["port"], game["key"], self._skin())
         self.app.go(GuestLobbyScene(self.app, client))
 
     def handle(self, event):
@@ -248,6 +251,7 @@ class HostLobbyScene(Scene):
 
     def _start(self):
         try:
+            self.server.skin = (self.app.settings.face_style, self.app.settings.back_style)
             session = self.server.start_game(SPEED_DELAYS[self.app.settings.ai_speed])
         except NetError as e:
             sfx.play("error")

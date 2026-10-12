@@ -6,6 +6,7 @@ import queue
 import threading
 
 from .. import __version__
+from ..skins import clean_skin
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
 from .bj_net import RemoteBlackjackGame
 from .fish_net import RemoteFishGame
@@ -15,8 +16,9 @@ from .snapshot import RemoteGame
 class ClientSession:
     """A guest's connection. Connecting runs in the background so the screen never freezes."""
 
-    def __init__(self, name: str, ip: str, port: int, key: int):
+    def __init__(self, name: str, ip: str, port: int, key: int, skin=("classic", "classic")):
         self.name = clean_name(name)
+        self.skin = list(clean_skin(skin))
         self.ip, self.port, self.key = ip, port, key
         self.inbox: queue.Queue = queue.Queue()
         self.conn: Connection | None = None
@@ -30,9 +32,9 @@ class ClientSession:
         threading.Thread(target=self._connect, daemon=True).start()
 
     @classmethod
-    def from_code(cls, name: str, code: str) -> "ClientSession":
+    def from_code(cls, name: str, code: str, skin=("classic", "classic")) -> "ClientSession":
         ip, port, key = decode_invite(code)
-        return cls(name, ip, port, key)
+        return cls(name, ip, port, key, skin)
 
     def _connect(self):
         try:
@@ -43,7 +45,8 @@ class ClientSession:
             return
         self.conn = conn
         self.status = "waiting"
-        conn.send({"t": "hello", "v": VERSION, "app": __version__, "key": self.key, "name": self.name})
+        conn.send({"t": "hello", "v": VERSION, "app": __version__, "key": self.key, "name": self.name,
+                   "skin": self.skin})
 
     def send(self, msg: dict):
         if self.conn:

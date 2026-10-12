@@ -40,7 +40,7 @@ def payout(line: tuple[str, str, str]) -> tuple[int, str]:
         real = {s for s in line if s != WILD}
         if len(real) == 1:
             sym = real.pop()
-            return THREE[sym], f"THREE {sym}S"
+            return THREE[sym], f"THREE {sym[:-1] + 'IES' if sym.endswith('Y') else sym + 'S'}"
     cherries = sum(1 for s in line if s == CHERRY)
     if cherries >= 2:
         return TWO_CHERRIES, "TWO CHERRIES"

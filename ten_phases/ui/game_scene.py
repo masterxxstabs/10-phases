@@ -20,6 +20,7 @@ from ..phases import NUM_PHASES, PHASES, GroupType, arrange_run, describe_phase
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .table_skins import TableSkins
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
 
@@ -48,8 +49,10 @@ def ease_out(t: float) -> float:
 
 class FlyingCard:
     def __init__(self, card: Card | None, start: pygame.Rect, end: pygame.Rect, duration: float = 0.32,
-                 delay: float = 0.0, hide_id: int | None = None):
+                 delay: float = 0.0, hide_id: int | None = None, face: str | None = None,
+                 back: str | None = None):
         self.card = card
+        self.face, self.back = face, back
         self.start = pygame.Rect(start)
         self.end = pygame.Rect(end)
         self.duration = duration
@@ -68,7 +71,7 @@ class FlyingCard:
         y = self.start.y + (self.end.y - self.start.y) * k - 40 * (4 * k * (1 - k))
         w = max(10, int(self.start.w + (self.end.w - self.start.w) * k))
         h = max(15, int(self.start.h + (self.end.h - self.start.h) * k))
-        img, _ = card_with_shadow(self.card, self.end.w, self.end.h, lift=12)
+        img, _ = card_with_shadow(self.card, self.end.w, self.end.h, lift=12, face=self.face, back=self.back)
         if img.get_width() != w + 8:
             img = pygame.transform.smoothscale(img, (w + 8, h + 8))
         surf.blit(img, (x, y))
@@ -95,6 +98,8 @@ class GameScene(Scene):
             players += [Player(name, difficulty=d) for name, d in zip(names, diffs)]
             self.game = Game(players)
             self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
+        self.skins = TableSkins(self)
+        self.hit_queue: list[tuple[int, int]] = []
         self.hint_ai = AIPlayer("Expert", random.Random(0), advisor=True)
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -310,6 +315,9 @@ class GameScene(Scene):
 
         for ev in g.pop_events():
             k = ev.kind
+            if k in ("draw", "discard", "hit"):
+                self.skins.own(ev.card, ev.player)
+            sk = self.skins.seat(ev.player)
             if k == "draw":
                 sound("draw")
                 src = DECK_RECT if ev.source == "deck" else DISCARD_RECT
@@ -321,7 +329,7 @@ class GameScene(Scene):
                         self.say(f"You took the {ev.card.label()}", theme.TEXT_DIM)
                 else:
                     face = ev.card if ev.source == "discard" else None
-                    self.anims.append(FlyingCard(face, src, self.player_anchor(ev.player)))
+                    self.anims.append(FlyingCard(face, src, self.player_anchor(ev.player), face=sk[0], back=sk[1]))
                     where = f"took the {ev.card.label()}" if ev.source == "discard" else "drew a card"
                     self.say(f"{self.name(ev.player)} {where}", theme.TEXT_DIM)
                 self.note(ev.player, f"Took the {ev.card.label()} from the discard" if ev.source == "discard"
@@ -329,7 +337,7 @@ class GameScene(Scene):
             elif k == "discard":
                 sound("discard")
                 start = origin.get(ev.card.id, self.player_anchor(ev.player))
-                self.anims.append(FlyingCard(ev.card, start, DISCARD_RECT, hide_id=ev.card.id))
+                self.anims.append(FlyingCard(ev.card, start, DISCARD_RECT, hide_id=ev.card.id, face=sk[0]))
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} discarded {ev.card.label()}", theme.TEXT_DIM)
                 self.note(ev.player, f"Discarded the {ev.card.label()}")
@@ -338,8 +346,11 @@ class GameScene(Scene):
                 self.note(ev.player, f"Laid down phase {self.shown_phase(ev.player) + 1}")
                 for m in [m for m in g.melds if m.owner == ev.player]:
                     for c in m.cards:
+                        self.skins.own(c, ev.player)
                         start = origin.get(c.id, self.player_anchor(ev.player))
-                        self.anims.append(FlyingCard(c, start, table_cards[c.id], 0.34, stagger, hide_id=c.id))
+                        self.anims.append(FlyingCard(c, start, table_cards.get(c.id, DISCARD_RECT), 0.34, stagger,
+                                                     hide_id=c.id,
+                                                     face=sk[0]))
                         stagger += 0.04
                 if ev.player == HUMAN:
                     n = self.shown_phase(ev.player) + 1
@@ -351,7 +362,8 @@ class GameScene(Scene):
             elif k == "hit":
                 sound("hit")
                 start = origin.get(ev.card.id, self.player_anchor(ev.player))
-                self.anims.append(FlyingCard(ev.card, start, table_cards[ev.card.id], 0.3, stagger, hide_id=ev.card.id))
+                end = table_cards.get(ev.card.id, DISCARD_RECT)   # late events can outlive their round
+                self.anims.append(FlyingCard(ev.card, start, end, 0.3, stagger, hide_id=ev.card.id, face=sk[0]))
                 stagger += 0.06
                 if ev.player != HUMAN:
                     self.say(f"{self.name(ev.player)} played {ev.card.label()}", theme.TEXT_DIM)
@@ -445,6 +457,11 @@ class GameScene(Scene):
         if not cards:
             self.error("Select cards from your hand, then click a group.")
             return
+        if self.client is not None and len(cards) > 1:
+            # The host answers one move at a time, so send the rest as each answer comes back.
+            self.hit_queue = [(c.id, meld_id) for c in cards]
+            self._next_queued_hit()
+            return
         placed = 0
         for c in cards:
             if self.game.round_over:
@@ -454,6 +471,18 @@ class GameScene(Scene):
                     placed += 1
         if placed == 0 and len(cards) > 1:
             self.error("None of those cards fit that group.")
+
+    def _next_queued_hit(self):
+        g = self.game
+        while self.hit_queue and not g.pending and self.my_turn and not g.round_over:
+            cid, meld_id = self.hit_queue.pop(0)
+            card = next((c for c in self.human.hand if c.id == cid), None)
+            meld = next((m for m in g.melds if m.id == meld_id), None)
+            if card is not None and meld is not None and meld.accepts(card):
+                self._act(g.hit, card, meld_id)
+                return
+        if not self.my_turn or g.round_over:
+            self.hit_queue = []
 
     def toggle_sort(self):
         s = self.app.settings
@@ -563,6 +592,7 @@ class GameScene(Scene):
 
     def _begin_round(self):
         self._round_seen = self.game.round
+        self.skins.reset()
         self.selected = []
         self.choosing_skip = None
         self._set_overlay(None)
@@ -583,6 +613,7 @@ class GameScene(Scene):
             for msg in self.client.poll():
                 t = msg["t"]
                 if t == "error":
+                    self.hit_queue = []
                     self.error(msg.get("msg", "That move wasn't allowed."))
                 elif t == "notice":
                     self.say(msg.get("msg", ""), theme.DANGER)
@@ -592,6 +623,8 @@ class GameScene(Scene):
                     from .multiplayer import GuestLobbyScene
                     self.app.go(GuestLobbyScene(self.app, self.client))
                     return
+            if self.hit_queue:
+                self._next_queued_hit()
             if self.client.status in ("closed", "failed") and self.overlay != "disconnected":
                 self._set_overlay("disconnected")
 
@@ -683,7 +716,9 @@ class GameScene(Scene):
         now = pygame.time.get_ticks()
         double = self._last_click[0] == cid and now - self._last_click[1] < 350
         self._last_click = (cid, now)
-        card = next(c for c in self.human.hand if c.id == cid)
+        card = next((c for c in self.human.hand if c.id == cid), None)
+        if card is None:   # a stale click on a card that just left the hand
+            return
         if (double or button == 3) and self.my_turn and self.game.has_drawn:
             self.selected = [cid]
             self.discard(card)
@@ -761,10 +796,14 @@ class GameScene(Scene):
         surf.blit(img, img.get_rect(center=r.center))
         return r
 
-    def _counts(self, surf, p: Player, right: int, y: int):
+    def _counts(self, surf, p: Player, right: int, y: int, seat: int | None = None):
         """Card count and chip count, right-aligned."""
         r = theme.ptext(surf, str(len(p.hand)), (right, y), 18, anchor="topright")
-        theme.mini_card_icon(surf, (r.x - 20, y + 1))
+        if seat:
+            back, _ = card_with_shadow(None, 16, 24, back=self.skins.back(seat))
+            surf.blit(back, (r.x - 22, y - 2))
+        else:
+            theme.mini_card_icon(surf, (r.x - 20, y + 1))
         r2 = theme.ptext(surf, str(p.chips), (right, y + 24), 18, theme.ACCENT, anchor="topright")
         theme.chip(surf, (r2.x - 14, y + 34), 9, theme.ACCENT)
 
@@ -789,7 +828,7 @@ class GameScene(Scene):
                 if c.id in hidden or c.id not in table_cards:
                     continue
                 r = table_cards[c.id]
-                img, _ = card_with_shadow(c, r.w, r.h)
+                img, _ = card_with_shadow(c, r.w, r.h, face=self.skins.card_face(c, meld.owner))
                 surf.blit(img, r)
             return
         if not mine:
@@ -826,7 +865,7 @@ class GameScene(Scene):
         theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20)
         label, color = self.role_chip(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color, size=10)
-        self._counts(surf, p, r.right - 12, r.y + 8)
+        self._counts(surf, p, r.right - 12, r.y + 8, i)
 
         inner = pygame.Rect(r.x + 8, r.y + 60, r.w - 16, r.h - 66)
         theme.rounded(surf, theme.INNER, inner, 8)
@@ -912,13 +951,14 @@ class GameScene(Scene):
 
         visible = [c for c in g.discard_pile if c.id not in hidden]
         if len(visible) >= 2:
-            under, _ = card_with_shadow(visible[-2], DISCARD_RECT.w, DISCARD_RECT.h)
+            under, _ = card_with_shadow(visible[-2], DISCARD_RECT.w, DISCARD_RECT.h,
+                                        face=self.skins.card_face(visible[-2]))
             surf.blit(pygame.transform.rotate(under, 7), DISCARD_RECT.move(-8, -6))
         if visible:
             top = visible[-1]
             can_take = can_draw and not top.is_skip
             lift = 6 if can_take and DISCARD_RECT.collidepoint(mouse) else 0
-            img, _ = card_with_shadow(top, DISCARD_RECT.w, DISCARD_RECT.h)
+            img, _ = card_with_shadow(top, DISCARD_RECT.w, DISCARD_RECT.h, face=self.skins.card_face(top))
             surf.blit(img, DISCARD_RECT.move(0, -lift))
             if can_take:
                 theme.rounded(surf, theme.ACCENT, DISCARD_RECT.move(0, -lift).inflate(8, 8), 14, 3)
@@ -1210,7 +1250,7 @@ class GameScene(Scene):
                 cards = meld.ordered()
                 step = min(50, (row.w - 190 - 46) / max(1, len(cards) - 1)) if len(cards) > 1 else 0
                 for n, c in enumerate(cards):
-                    img, _ = card_with_shadow(c, 46, 69)
+                    img, _ = card_with_shadow(c, 46, 69, face=self.skins.card_face(c, meld.owner))
                     surf.blit(img, (row.x + 180 + n * step, row.y + 5))
             y += 86
 
@@ -1218,7 +1258,7 @@ class GameScene(Scene):
         theme.ptext(surf, "PICKED UP FROM THE DISCARD THIS ROUND", (rect.x + 18, y), 14, theme.ACCENT)
         if picked:
             for n, c in enumerate(picked):
-                img, _ = card_with_shadow(c, 30, 45)
+                img, _ = card_with_shadow(c, 30, 45, face=self.skins.face(i))
                 surf.blit(img, (rect.x + 18 + n * 36, y + 20))
         else:
             theme.ptext(surf, "Nothing yet", (rect.x + 18, y + 24), 15, theme.TEXT_FAINT)

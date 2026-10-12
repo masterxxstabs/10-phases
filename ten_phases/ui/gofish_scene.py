@@ -18,6 +18,7 @@ from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
@@ -62,6 +63,7 @@ class GoFishScene(Scene):
             players += [FishPlayer(n, difficulty=d) for n, d in zip(names, diffs)]
             self.game = GoFishGame(players)
             self.ais = {i + 1: GoFishAI(d) for i, d in enumerate(diffs)}
+        self.skins = TableSkins(self)
         self.hint_ai = GoFishAI("Expert", random.Random(0))
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -195,7 +197,8 @@ class GoFishScene(Scene):
                 for c in ev.cards:
                     start = origin.get(c.id, self.anchor(ev.target))
                     end = hand.get(c.id, self.anchor(ev.player))
-                    self.anims.append(FlyingCard(c, start, end, 0.36, stagger, hide_id=c.id))
+                    self.anims.append(FlyingCard(c, start, end, 0.36, stagger, hide_id=c.id,
+                                                 face=self.skins.face(ev.target)))
                     stagger += 0.06
                     if ev.player == HUMAN:
                         self.new_ids.add(c.id)
@@ -210,8 +213,9 @@ class GoFishScene(Scene):
                 c = ev.cards[0]
                 show = ev.player == HUMAN or ev.lucky
                 end = hand.get(c.id, self.anchor(ev.player)) if ev.player == HUMAN else self.anchor(ev.player)
+                sk = self.skins.seat(ev.player)
                 self.anims.append(FlyingCard(c if show else None, self.pond_rect(), end, 0.4, stagger,
-                                             hide_id=c.id if ev.player == HUMAN else None))
+                                             hide_id=c.id if ev.player == HUMAN else None, face=sk[0], back=sk[1]))
                 stagger += 0.08
                 if ev.player == HUMAN:
                     self.new_ids.add(c.id)
@@ -224,7 +228,8 @@ class GoFishScene(Scene):
             elif k == "book":
                 for n, c in enumerate(ev.cards):
                     start = origin.get(c.id, hand.get(c.id, self.anchor(ev.player)))
-                    self.anims.append(FlyingCard(c, start, self.book_slot(ev.value), 0.42, stagger + 0.05 * n))
+                    self.anims.append(FlyingCard(c, start, self.book_slot(ev.value), 0.42, stagger + 0.05 * n,
+                                                 face=self.skins.face(ev.player)))
                 stagger += 0.25
                 who = "You" if ev.player == HUMAN else self.name(ev.player).title()
                 self.say(f"{who} made a book of {plural(ev.value)}!", theme.SUCCESS)
@@ -384,7 +389,9 @@ class GoFishScene(Scene):
             return
         for cid, rect in reversed(list(self.card_rects.items())):
             if rect.collidepoint(event.pos):
-                card = next(c for c in self.me.hand if c.id == cid)
+                card = next((c for c in self.me.hand if c.id == cid), None)
+                if card is None:   # a stale click on a card that just left the hand
+                    return
                 if self.selected_value == card.value:
                     self.selected_value = None
                     sfx.play("deselect")
@@ -469,10 +476,11 @@ class GoFishScene(Scene):
         surf.blit(img, img.get_rect(center=r.center))
         return r
 
-    def _book_badge(self, surf, center, value: int, size: int = 30):
-        """A little fan of the four colours of one number."""
+    def _book_badge(self, surf, center, value: int, size: int = 30, seat: int | None = None):
+        """A little fan of the four colours of one number, in the skin of whoever made the book."""
+        face = self.skins.face(seat)
         for k, c in enumerate(COLORS):
-            img, _ = card_with_shadow(number(c, value), size, int(size * 1.5))
+            img, _ = card_with_shadow(number(c, value), size, int(size * 1.5), face=face)
             surf.blit(img, img.get_rect(center=(center[0] - 9 + k * 6, center[1] - 3 + k * 2)))
 
     def _draw_opponent(self, surf, i: int):
@@ -490,7 +498,9 @@ class GoFishScene(Scene):
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color)
         cnt = theme.ptext(surf, str(len(p.hand)), (r.right - 12, r.y + 8), 18, anchor="topright")
-        theme.mini_card_icon(surf, (cnt.x - 20, r.y + 9))
+        back, _ = card_with_shadow(None, 18, 27, back=self.skins.back(i))
+        for k in range(min(3, len(p.hand))):
+            surf.blit(back, (cnt.x - 26 - k * 7, r.y + 6 + k))
         inner = pygame.Rect(r.x + 8, r.y + 60, r.w - 16, r.h - 66)
         theme.rounded(surf, theme.INNER, inner, 8)
         theme.ptext(surf, f"BOOKS {len(p.books)}", (inner.x + 10, inner.y + 6), 16, theme.ACCENT)
@@ -501,7 +511,7 @@ class GoFishScene(Scene):
         for k, v in enumerate(p.books):
             cx = inner.x + 28 + (k % per_row) * 42
             cy = inner.y + 60 + (k // per_row) * 52
-            self._book_badge(surf, (cx, cy), v, 24)
+            self._book_badge(surf, (cx, cy), v, 24, i)
         if not p.books:
             theme.ptext(surf, "NO BOOKS YET", inner.move(0, 12).center, 14, theme.TEXT_FAINT, anchor="center")
 
@@ -549,7 +559,7 @@ class GoFishScene(Scene):
             mine = owner.get(v) == HUMAN
             theme.rounded(surf, theme.PANEL_HOVER if mine else theme.INNER, slot, 8)
             if v in owner and slot.topleft not in animating:
-                self._book_badge(surf, (slot.centerx, slot.centery - 6), v, 34)
+                self._book_badge(surf, (slot.centerx, slot.centery - 6), v, 34, owner[v])
                 who = owner[v]
                 theme.face(surf, (slot.right - 14, slot.bottom - 14), 11, who)
                 if mine:
@@ -642,7 +652,7 @@ class GoFishScene(Scene):
         y = rect.y + 80
         if p.books:
             for k, v in enumerate(p.books):
-                self._book_badge(surf, (rect.x + 40 + k * 42, y + 36), v, 28)
+                self._book_badge(surf, (rect.x + 40 + k * 42, y + 36), v, 28, i)
         else:
             theme.ptext(surf, "No books yet", (rect.x + 20, y + 30), 16, theme.TEXT_FAINT)
         y += 84
@@ -701,6 +711,6 @@ class GoFishScene(Scene):
                 theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, anchor="midleft")
                 theme.ptext(surf, f"{len(p.books)}", (row.x + 230, row.centery), 26, theme.ACCENT, anchor="center")
                 for n, v in enumerate(p.books):
-                    self._book_badge(surf, (row.x + 290 + n * 36, row.centery + 2), v, 22)
+                    self._book_badge(surf, (row.x + 290 + n * 36, row.centery + 2), v, 22, i)
         for b in self.overlay_buttons:
             b.draw(surf)

@@ -10,6 +10,7 @@ from __future__ import annotations
 from ..cards import Card, Kind
 from ..gofish.ai import GoFishAI
 from ..gofish.engine import FishEvent, FishPlayer, GoFishGame, RuleError
+from ..skins import clean_skin, player_skin
 from .protocol import Connection
 from .snapshot import _KIND_BACK, _COLOR_BACK, card_out, rotate, unrotate
 
@@ -24,7 +25,7 @@ def fish_snapshot_for(game: GoFishGame, viewer: int) -> dict:
         "players": [{
             "name": game.players[r].name, "human": game.players[r].is_human,
             "difficulty": game.players[r].difficulty, "books": list(game.players[r].books),
-            "count": len(game.players[r].hand),
+            "count": len(game.players[r].hand), "skin": list(player_skin(game.players[r])),
             "hand": [card_out(c) for c in game.players[r].hand] if r == viewer else None,
         } for r in order],
     }
@@ -79,6 +80,7 @@ class RemoteFishGame:
         for d in snap["players"]:
             p = FishPlayer(d["name"], is_human=d["human"], difficulty=d["difficulty"])
             p.books = list(d["books"])
+            p.skin = clean_skin(d.get("skin"))
             p.hand = [self._card(c) for c in d["hand"]] if d["hand"] is not None else \
                 [Card(Kind.SKIP, id=-1) for _ in range(d["count"])]
             players.append(p)

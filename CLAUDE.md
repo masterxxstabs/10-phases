@@ -24,7 +24,12 @@
   `host`/`session`/`client`. `net/fish_net.py` and `net/bj_net.py` are good templates. Bump `VERSION` in `net/protocol.py` when the wire format
   changes.
 - Chips: games bank chips into `settings.chip_bank`. The Card Shop (`shop.py`, `ui/shop_scene.py`)
-  sells skins that `ui/card_art.py` draws via `theme.FACE_STYLE` / `theme.BACK_STYLE`.
+  sells card packs (`ui/pack_open.py` is the rip-and-flip opening, `ui/pack_art.py` its art and
+  effects). The skins live in `skins.py`; `ui/card_art.py` draws them (generated `g###`/`f###`
+  skins via `ui/skin_gen.py`). A generated skin is rebuilt from its number, so never change the
+  generator's output for an existing number: players own them and multiplayer relies on it.
+- Skins in multiplayer: each player's (face, back) goes in the hello and in every snapshot
+  (`player.skin`). Scenes draw other seats' cards through `ui/table_skins.py`.
 - Look and feel: everything is drawn in code (`ui/theme.py`, `ui/card_art.py`) in a
   handheld DS style. Use the theme's color roles so Customize works. Text uses the
   bundled pixel font through `theme.ptext`.

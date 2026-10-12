@@ -15,6 +15,7 @@ from .. import __version__
 from ..ai import AIPlayer
 from ..game import Game, Player, RuleError
 from ..names import AI_NAMES
+from ..skins import clean_skin, player_skin
 from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
     local_ips, new_room_key
@@ -27,7 +28,9 @@ GAMES = ("10 PHASES", "GO FISH", "BLACKJACK")
 
 
 class HostServer:
-    def __init__(self, name: str, port: int = GAME_PORT, announce: bool = True, game: str = "10 PHASES"):
+    def __init__(self, name: str, port: int = GAME_PORT, announce: bool = True, game: str = "10 PHASES",
+                 skin=("classic", "classic")):
+        self.skin = clean_skin(skin)   # the host's own card skins
         self.name = clean_name(name, "HOST")
         self.game = game if game in GAMES else GAMES[0]   # which card game this lobby plays
         self.key = new_room_key()
@@ -188,6 +191,7 @@ class HostServer:
             name = f"{base[:8]}{k}"
             k += 1
         conn.tag = name
+        conn.skin = clean_skin(msg.get("skin"))
         self.guests.append(conn)
         conn.send({"t": "welcome", "name": name, "host": self.name})
         self.notices.append(f"{name} joined")
@@ -203,6 +207,7 @@ class HostServer:
             names = self._ai_names()
             starter = start_fish if self.game == "GO FISH" else start_blackjack
             self.session = starter(self, names, [self._ai_level(k) for k in range(len(names))])
+            self.dress(self.session.game.players)
             for g in self.guests:
                 g.send({"t": "start", "game": self.game})
             self.session.flush(force=True)
@@ -216,10 +221,19 @@ class HostServer:
             ais[len(players) - 1] = AIPlayer(level)
         game = Game(players, random.Random())
         self.session = HostSession(self, game, ais)
+        self.dress(players)
         for g in self.guests:
             g.send({"t": "start", "game": self.game})
         self.session.flush(force=True)
         return self.session
+
+    def dress(self, players) -> None:
+        """Give every seat its skins: the host's, each guest's own, and a random pick for computers."""
+        players[0].skin = self.skin
+        for g, p in zip(self.guests, players[1:]):
+            p.skin = getattr(g, "skin", ("classic", "classic"))
+        for p in players[1 + len(self.guests):]:
+            p.skin = player_skin(p)
 
     def back_to_lobby(self):
         self._ai_pool = random.sample(AI_NAMES, len(AI_NAMES))  # new computer opponents for the rematch
@@ -267,16 +281,18 @@ class HostSession:
                 (g.draw_from_discard if msg.get("src") == "discard" else g.draw_from_deck)(seat)
             elif a == "lay":
                 ids = msg.get("cards") or []
-                if not all(isinstance(i, int) and i in hand for i in ids):
+                if not isinstance(ids, list) or not all(isinstance(i, int) and i in hand for i in ids):
                     raise RuleError("Those cards aren't in your hand.")
                 g.lay_down_auto(seat, [hand[i] for i in ids])
             elif a == "hit":
-                card = hand.get(msg.get("card"))
+                card = hand.get(msg.get("card")) if isinstance(msg.get("card"), int) else None
                 if card is None:
                     raise RuleError("That card isn't in your hand.")
+                if not isinstance(msg.get("meld"), int):
+                    raise RuleError("Pick a group to add to.")
                 g.hit(seat, card, msg.get("meld"))
             elif a == "discard":
-                card = hand.get(msg.get("card"))
+                card = hand.get(msg.get("card")) if isinstance(msg.get("card"), int) else None
                 if card is None:
                     raise RuleError("That card isn't in your hand.")
                 target = msg.get("target")

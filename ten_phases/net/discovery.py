@@ -89,7 +89,10 @@ class Browser:
             if not isinstance(info, dict) or info.get("g") != "10phases" or info.get("v") != VERSION:
                 continue
             port = info.get("port")
-            if not isinstance(port, int):
+            # Anyone on the network can send these, so only trust well-formed ones.
+            if not (isinstance(port, int) and isinstance(info.get("key"), int)
+                    and isinstance(info.get("players", 0), int) and isinstance(info.get("max", 0), int)
+                    and isinstance(info.get("name", ""), str) and isinstance(info.get("ip", ""), (str, type(None)))):
                 continue
             with self._lock:
                 key = (info.get("ip") or ip, port)
