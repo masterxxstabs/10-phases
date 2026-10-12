@@ -20,6 +20,7 @@ from ..phases import NUM_PHASES, PHASES, GroupType, arrange_run, describe_phase
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .admin import AdminPanel
 from .table_skins import TableSkins
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
@@ -99,6 +100,7 @@ class GameScene(Scene):
             self.game = Game(players)
             self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
+        self.admin = AdminPanel(self)
         self.hit_queue: list[tuple[int, int]] = []
         self.hint_ai = AIPlayer("Expert", random.Random(0), advisor=True)
         self.delay = SPEED_DELAYS[s.ai_speed]
@@ -160,6 +162,8 @@ class GameScene(Scene):
     @property
     def flow_blocked(self) -> bool:
         """Whether the computer players should wait. In network games the pause menu doesn't stop play."""
+        if self.admin.blocking:
+            return True
         if self.anims or self.splash is not None:
             return True
         if self.overlay == "pause":
@@ -654,6 +658,8 @@ class GameScene(Scene):
     # ================================================================== input
 
     def handle(self, event):
+        if self.admin.handle(event):
+            return
         if self.overlay:
             for b in self.overlay_buttons:
                 if b.handle(event):
@@ -734,6 +740,7 @@ class GameScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self.admin.update(dt)
         self._pump_network()
         g = self.game
         if g.round != self._round_seen and not g.round_over:
@@ -785,6 +792,7 @@ class GameScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.admin.draw(surf)
 
     # ---------------------------------------------------------------- pieces
 

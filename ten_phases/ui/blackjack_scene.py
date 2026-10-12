@@ -17,6 +17,7 @@ from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .admin import AdminPanel
 from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, backdrop, status_bar
@@ -61,6 +62,7 @@ class BlackjackScene(Scene):
             self.game = BlackjackGame(players)
             self.ais = {i + 1: BlackjackAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
+        self.admin = AdminPanel(self)
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.bet_amount = 5
         self.anims: list[FlyingCard] = []
@@ -108,6 +110,8 @@ class BlackjackScene(Scene):
 
     @property
     def flow_blocked(self) -> bool:
+        if self.admin.blocking:
+            return True
         if self.anims or self.splash is not None:
             return True
         return self.overlay is not None and not (self.overlay == "pause" and self.networked)
@@ -380,6 +384,8 @@ class BlackjackScene(Scene):
     # ================================================================== input
 
     def handle(self, event):
+        if self.admin.handle(event):
+            return
         if self.overlay:
             for b in self.overlay_buttons:
                 if b.handle(event):
@@ -409,6 +415,7 @@ class BlackjackScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self.admin.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -468,6 +475,7 @@ class BlackjackScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.admin.draw(surf)
 
     def _status(self) -> str:
         g = self.game

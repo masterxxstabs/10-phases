@@ -31,6 +31,10 @@
   generator's output for an existing number: players own them and multiplayer relies on it.
 - Skins in multiplayer: each player's (face, back) goes in the hello and in every snapshot
   (`player.skin`). Scenes draw other seats' cards through `ui/table_skins.py`.
+- Admin panel (`ui/admin.py`): F12 at any card table, password-checked against the salted
+  PBKDF2 hash in `admin_key.py` (set with `tools/set_admin_password.py`). Never put the
+  plain password in the repo, release notes or tests. Each table scene creates `self.admin`,
+  lets it handle events first, adds `admin.blocking` to `flow_blocked`, and draws it last.
 - Look and feel: everything is drawn in code (`ui/theme.py`, `ui/card_art.py`) in a
   handheld DS style. Use the theme's color roles so Customize works. Text uses the
   bundled pixel font through `theme.ptext`.

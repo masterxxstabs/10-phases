@@ -6,24 +6,10 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402
-import pytest  # noqa: E402
 
 from ten_phases.cards import Color, number  # noqa: E402
 from ten_phases.ui import sfx  # noqa: E402
-from ten_phases.ui.app import App  # noqa: E402
 from ten_phases.ui.game_scene import GameScene  # noqa: E402
-
-
-@pytest.fixture(scope="module")
-def app(tmp_path_factory):
-    # One window for the whole module: pygame can't recreate a scaled window headless, and
-    # cached fonts belong to the running session.
-    import ten_phases.settings as settings_module
-
-    original = settings_module.SETTINGS_PATH
-    settings_module.SETTINGS_PATH = tmp_path_factory.mktemp("cfg") / "settings.json"
-    yield App(check_updates=False)
-    settings_module.SETTINGS_PATH = original
 
 
 def test_every_sound_builds():

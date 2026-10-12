@@ -154,6 +154,17 @@ The fourth game on the main menu: no-limit Texas Hold'em for 2-6 players.
 - **Hard** sizes its bets to the pot and bluffs now and then.
 - **Expert** adds position, semi-bluffs, blind steals and varied bet sizes.
 
+## Admin panel
+
+A password-protected panel for the game's owner. At any card table (10 Phases, Go Fish, Blackjack or Poker) press **F12** or **Ctrl+Shift+D** and enter the admin password. It stays unlocked until you close the game or press **LOCK**. After 3 wrong passwords it locks for 30 seconds.
+
+- **See every hand:** every player's cards, plus the dealer's hidden card in Blackjack.
+- **Give a card:** press **GIVE** on a player, pick a color and number (or WILD/SKIP in 10 Phases), then **GIVE CARD**. In Blackjack it goes on their current hand. In Poker, **SWAP IN** replaces one of their two cards, and a card that's already in play is refused.
+- **Kick:** removes a guest from a game you host, and a computer takes their seat.
+- **+100 CHIP BANK** for testing the shop.
+- Solo games pause while the panel is open. In multiplayer, changes only work on the host, and guests see them right away. On a guest's copy the panel is view-only.
+- Only a salted hash of the password is stored (`ten_phases/admin_key.py`). Change the password with `python tools/set_admin_password.py [new-password]`, then commit and push.
+
 ## Card Shop
 
 The **SHOP** button under your Chip Bank opens the shop. Spend chips on card packs, then equip the skins you find:
@@ -275,7 +286,7 @@ ten_phases/
   names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions
-tools/          make_icon.py (app icon), build.py (PyInstaller one-file build),
+tools/          make_icon.py (app icon), build.py (PyInstaller one-file build), set_admin_password.py,
                 check_update.py (self-update check on the real exe), release_notes.py (from CHANGELOG.md)
 .github/        workflow that builds and publishes the Windows exe
   net/          multiplayer: invite codes and connections (protocol.py), LAN discovery,

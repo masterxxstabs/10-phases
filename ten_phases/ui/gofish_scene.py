@@ -18,6 +18,7 @@ from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
 from . import sfx, theme
 from .card_art import card_with_shadow
+from .admin import AdminPanel
 from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, _wrap, backdrop, status_bar
@@ -64,6 +65,7 @@ class GoFishScene(Scene):
             self.game = GoFishGame(players)
             self.ais = {i + 1: GoFishAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
+        self.admin = AdminPanel(self)
         self.hint_ai = GoFishAI("Expert", random.Random(0))
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -104,6 +106,8 @@ class GoFishScene(Scene):
     @property
     def flow_blocked(self) -> bool:
         """Computers wait during animations; in network games the pause menu doesn't stop play."""
+        if self.admin.blocking:
+            return True
         if self.anims or self.splash is not None:
             return True
         return self.overlay is not None and not (self.overlay == "pause" and self.networked)
@@ -369,6 +373,8 @@ class GoFishScene(Scene):
     # ================================================================== input
 
     def handle(self, event):
+        if self.admin.handle(event):
+            return
         if self.overlay:
             for b in self.overlay_buttons:
                 if b.handle(event):
@@ -408,6 +414,7 @@ class GoFishScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self.admin.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -457,6 +464,7 @@ class GoFishScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.admin.draw(surf)
 
     def _status(self) -> str:
         g = self.game

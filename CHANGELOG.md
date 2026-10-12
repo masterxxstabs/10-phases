@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.9.0
+
+- New password-protected admin panel for the game's owner, opened from any card table
+- Admin tools: see every player's cards, give any player a card, and kick guests from games you host
+- Small fixes to the test setup
+
 ## 1.8.0
 
 - New game: Texas Hold'em Poker! Arrow over to POKER on the main menu
