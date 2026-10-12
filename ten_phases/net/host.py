@@ -18,10 +18,11 @@ from ..names import AI_NAMES
 from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
     local_ips, new_room_key
+from .bj_net import start_blackjack
 from .fish_net import start_fish
 from .snapshot import events_for, snapshot_for, unrotate
 
-GAMES = ("10 PHASES", "GO FISH")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK")
 
 
 
@@ -198,9 +199,10 @@ class HostServer:
         if 1 + len(self.guests) + self.ai_count < 2:
             raise NetError("You need at least one other player or computer.")
         self.in_game = True
-        if self.game == "GO FISH":
+        if self.game in ("GO FISH", "BLACKJACK"):
             names = self._ai_names()
-            self.session = start_fish(self, names, [self._ai_level(k) for k in range(len(names))])
+            starter = start_fish if self.game == "GO FISH" else start_blackjack
+            self.session = starter(self, names, [self._ai_level(k) for k in range(len(names))])
             for g in self.guests:
                 g.send({"t": "start", "game": self.game})
             self.session.flush(force=True)

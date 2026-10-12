@@ -63,7 +63,7 @@ Requires Python 3.10+.
 
 Play with up to 5 friends, and fill any empty seats with computer players. There's no server to run, because one player's game hosts the table.
 
-**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES** or **GO FISH** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
+**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES**, **GO FISH** or **BLACKJACK** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
 - You get an invite code like `DAAAA-SCZH7-RE8PR`. **COPY CODE** puts it on your clipboard so you can send it to friends.
 - Choose how many computer players to add and their level, then press **START GAME** once your friends are in.
 - **KICK** removes a player from the lobby.
@@ -116,7 +116,27 @@ Go Fish uses the same table, cards and look:
 - **Helpers:** speech bubbles show every question and answer, the **BOOKS** board shows all 12 books and who made each, and **HINT** suggests who to ask for what.
 - **Hover:** hovering a player shows their books and, with Hints on, what they've asked for.
 
-Settings (opponents, AI level, speed, sounds, hints) and Customize apply to both games. Both games work in multiplayer: the host picks the game in the lobby.
+Settings (opponents, AI level, speed, sounds, hints) and Customize apply to both games. All three games work in multiplayer: the host picks the game in the lobby.
+
+## Blackjack
+
+The third game on the main menu. You and the other players each play against a computer dealer for 10 hands:
+- **Cards:** a 4-deck shoe of A, 2–10, J, Q and K in the four colors (the colors act as suits). J, Q and K count 10; an Ace counts 1 or 11.
+- **Betting:** everyone starts with 50 chips. Pick a bet of 1–10 with **−/+** and press **DEAL**.
+- **Your turn:** **HIT**, **STAND**, **DOUBLE** (double your bet for exactly one more card) or **SPLIT** a pair, once per hand. Split aces get one card each. Keys: H, S, D, P.
+- **The dealer** checks for blackjack under an Ace or 10-value card, then hits until 17 or more. Wins pay 1:1, blackjack pays 3:2, and ties push.
+- **Winning:** after 10 hands, the most chips wins. The chips you finish with go into your Chip Bank.
+- **Hint** shows the basic-strategy move and why ("16 against 10: the dealer is likely to make 17+, so hit").
+
+**Computer players:**
+- **Easy** plays by feel.
+- **Medium** copies the dealer.
+- **Hard** plays perfect basic strategy.
+- **Expert** adds Hi-Lo card counting, which changes its bets and a few plays.
+
+Return per chip bet over 20,000 simulated hands: Easy −6.7%, Medium −4.6%, Hard −0.2%, Expert +0.7%.
+
+Hovering a seat shows that player's chips, net for the game, current hands and recent results.
 
 ## Knowing your phase
 
@@ -206,6 +226,7 @@ ten_phases/
   game.py       rules engine (turns, laying down, hitting, skips, scoring)
   ai.py         computer players and difficulty profiles
   gofish/       Go Fish rules (engine.py) and computer players (ai.py)
+  blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
   names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions

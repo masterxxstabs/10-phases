@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.5.0
+
+- New game: Blackjack! Arrow over to it on the main menu
+- Beat the dealer over 10 hands: hit, stand, double down and split, with blackjack paying 3:2
+- Computer players from Easy to Expert (Expert counts cards!) and a Hint that explains the perfect move
+- Blackjack works in multiplayer too: pick it in the lobby
+
 ## 1.4.0
 
 - Go Fish multiplayer! Pick 10 PHASES or GO FISH in the lobby, then invite friends the same way

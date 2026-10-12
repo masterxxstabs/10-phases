@@ -203,3 +203,63 @@ def test_full_go_fish_game_over_localhost():
             assert c.game.books_made() == 12
     finally:
         server.close()
+
+
+def test_full_blackjack_game_over_localhost():
+    from ten_phases.blackjack.ai import BlackjackAI
+
+    server = HostServer("HOSTY", port=0, announce=False, game="BLACKJACK")
+    try:
+        guests = [ClientSession(n, "127.0.0.1", server.port, server.key) for n in ("ANA", "BO")]
+
+        def pump_all():
+            server.pump()
+            for c in guests:
+                c.poll()
+        assert wait_for(lambda: all(c.status == "joined" and len(c.members) == 3 for c in guests), pump_all)
+        guests.sort(key=lambda c: c.my_index)
+        server.set_ai_count(2)
+        session = server.start_game()
+        game = session.game
+        assert wait_for(lambda: all(c.game is not None and c.game.players for c in guests), pump_all)
+        assert all(type(c.game).__name__ == "RemoteBlackjackGame" for c in guests)
+        host_ai = BlackjackAI("Hard", random.Random(1))
+        guest_ai = [BlackjackAI("Hard", random.Random(2 + k)) for k in range(2)]
+        hole_leaked = False
+        for _ in range(60000):
+            pump_all()
+            for c in guests:
+                rg = c.game
+                if rg.hole_hidden and len(rg.dealer) > 1 and rg.dealer[1].id != -3:
+                    hole_leaked = True
+            if game.game_over:
+                break
+            if game.phase == "settled":
+                game.next_round()
+                continue
+            if game.phase == "betting":
+                for i in game.waiting_for_bets():
+                    if i == 0 or i in session.ais:
+                        game.place_bet(i, (session.ais.get(i) or host_ai).choose_bet(game, i))
+                for k, c in enumerate(guests):
+                    rg = c.game
+                    if rg.phase == "betting" and 0 in rg.waiting_for_bets() and not rg.pending:
+                        rg.place_bet(0, guest_ai[k].choose_bet(rg, 0))
+                continue
+            seat = game.turn[0]
+            if seat == 0 or seat in session.ais:
+                ai = session.ais.get(seat, host_ai)
+                getattr(game, ai.choose_action(game, seat))(seat)
+                continue
+            rg = guests[seat - 1].game
+            if rg.pending or not rg.legal_actions(0):
+                time.sleep(0.001)
+                continue
+            getattr(rg, guest_ai[seat - 1].choose_action(rg, 0))(0)
+        assert game.game_over and not hole_leaked
+        assert wait_for(lambda: all(c.game.game_over for c in guests), pump_all)
+        for c in guests:
+            seat = 1 + guests.index(c)
+            assert c.game.players[0].chips == game.players[seat].chips
+    finally:
+        server.close()

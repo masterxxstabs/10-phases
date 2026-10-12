@@ -96,6 +96,10 @@ def smoke_test() -> None:
     app.running = True
     app.go(GoFishScene(app))
     app.run(max_frames=90)
+    from .blackjack_scene import BlackjackScene
+    app.running = True
+    app.go(BlackjackScene(app))
+    app.run(max_frames=90)
     pygame.quit()
     marker = os.environ.get("TEN_PHASES_SMOKE_MARKER")
     if marker:

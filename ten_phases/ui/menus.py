@@ -44,7 +44,7 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK")
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
 
@@ -75,7 +75,12 @@ class MenuScene(Scene):
 
     def _build_fan(self):
         rng = random.Random()
-        if self.game == "GO FISH":
+        if self.game == "BLACKJACK":
+            from ..blackjack.engine import bj_card
+            cols = rng.sample(COLORS, 4)
+            self.fan = [bj_card(cols[0], 1), bj_card(cols[1], 13), bj_card(cols[2], 12), bj_card(cols[3], 11),
+                        bj_card(cols[0], 10)][:rng.choice([2, 5])]
+        elif self.game == "GO FISH":
             v = rng.randint(1, 12)
             w = rng.choice([x for x in range(1, 13) if x != v])
             self.fan = [number(c, w) for c in COLORS[:3]] + [number(c, v) for c in COLORS]
@@ -112,7 +117,10 @@ class MenuScene(Scene):
         self.app.go(CustomizeScene(self.app))
 
     def _play(self):
-        if self.game == "GO FISH":
+        if self.game == "BLACKJACK":
+            from .blackjack_scene import BlackjackScene
+            self.app.go(BlackjackScene(self.app))
+        elif self.game == "GO FISH":
             from .gofish_scene import GoFishScene
             self.app.go(GoFishScene(self.app))
         else:
@@ -215,8 +223,7 @@ class MenuScene(Scene):
             b.draw(surf)
         self._draw_update(surf)
         self._draw_bank(surf)
-        other = GAMES[(GAMES.index(self.game) + 1) % len(GAMES)]
-        status_bar(surf, f"Press PLAY for {self.game}!   {info}   -   arrows switch to {other}")
+        status_bar(surf, f"Press PLAY for {self.game}!   {info}   -   arrows switch games")
 
     def _draw_bank(self, surf):
         """Chips kept from finished games."""
@@ -305,6 +312,17 @@ HOW_TO = [
     "Space draws, double-click discards, Esc opens the menu.",
 ]
 
+HOW_TO_BLACKJACK = [
+    "Beat the dealer: get closer to 21 than the dealer without going over. Number cards count their number, "
+    "J/Q/K count 10, and an Ace counts 1 or 11.",
+    "Each hand, choose your bet (1-10 chips) with - and +, then press DEAL. Everyone starts with 50 chips.",
+    "HIT takes a card, STAND keeps what you have. DOUBLE doubles your bet for exactly one more card.",
+    "SPLIT turns a pair into two hands (once per hand). Split aces get one card each.",
+    "The dealer reveals their face-down card, then hits until 17 or more. Win pays 1:1, blackjack pays 3:2.",
+    "After 10 hands, most chips wins. The chips you finish with go into your CHIP BANK.",
+    "Stuck? HINT shows the perfect basic-strategy move and why. Keys: H hit, S stand, D double, P split.",
+]
+
 HOW_TO_FISH = [
     "Collect books: all four colors of one number (like a red, blue, green and yellow 7).",
     "On your turn, click a card in your hand, then click a player to ask them for that number.",
@@ -335,12 +353,12 @@ class HowToScene(Scene):
 
     def draw(self, surf):
         backdrop(surf, self.clock)
-        theme.logo(surf, "HOW TO PLAY" if self.game != "GO FISH" else "GO FISH RULES", (theme.WIDTH // 2, 64), 50,
-                   angle=4)
+        title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES"}.get(self.game, "HOW TO PLAY")
+        theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
-        for line in (HOW_TO_FISH if self.game == "GO FISH" else HOW_TO):
+        for line in {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK}.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
                 theme.text(surf, chunk, (left.x + 44, y), 17, theme.TEXT, bold=False)
@@ -352,6 +370,11 @@ class HowToScene(Scene):
             self._draw_fish_panel(surf, panel)
             self.back.draw(surf)
             status_bar(surf, f"Go Fish  -  10 Phases v{__version__}")
+            return
+        if self.game == "BLACKJACK":
+            _draw_blackjack_panel(surf, panel)
+            self.back.draw(surf)
+            status_bar(surf, f"Blackjack  -  10 Phases v{__version__}")
             return
         theme.ptext(surf, "THE 10 PHASES", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
         for i in range(NUM_PHASES):
@@ -379,6 +402,21 @@ def _draw_fish_panel_impl(surf, panel):
     theme.ptext(surf, "48 CARDS IN THE POND", (panel.x + 24, panel.y + 340), 18, theme.ACCENT)
     theme.ptext(surf, "7 each with 2-3 players, 5 each with 4-6", (panel.x + 24, panel.y + 370), 15, theme.TEXT_DIM)
     theme.logo(surf, "GO FISH!", (panel.centerx, panel.bottom - 80), 52, angle=6)
+
+
+def _draw_blackjack_panel(surf, panel):
+    from ..blackjack.engine import bj_card
+    theme.ptext(surf, "BLACKJACK!", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+    theme.ptext(surf, "An Ace with a 10, J, Q or K", (panel.x + 24, panel.y + 50), 15, theme.TEXT_DIM)
+    for k, (c, v) in enumerate(((COLORS[0], 1), (COLORS[1], 13))):
+        img, _ = card_with_shadow(bj_card(c, v), 84, 126)
+        surf.blit(pygame.transform.rotate(img, 8 - k * 16), (panel.x + 120 + k * 90, panel.y + 86))
+    rows = [("CARD VALUES", "2-10 = number, J Q K = 10, A = 1 or 11"), ("PAYOUTS", "Win 1:1, Blackjack 3:2, tie pushes"),
+            ("THE DEALER", "Hits 16 or less, stands on 17+")]
+    for k, (head, line) in enumerate(rows):
+        theme.ptext(surf, head, (panel.x + 24, panel.y + 260 + k * 70), 18, theme.ACCENT)
+        theme.ptext(surf, line, (panel.x + 24, panel.y + 290 + k * 70), 15, theme.TEXT_DIM)
+    theme.logo(surf, "21!", (panel.centerx, panel.bottom - 50), 52, angle=6)
 
 
 def _wrap(msg: str, size: int, width: int, pixel: bool = False) -> list[str]:

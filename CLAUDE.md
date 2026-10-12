@@ -9,16 +9,17 @@
 
 ## How the project fits together
 
-- `ten_phases/` is the app. Each game has a rules engine with no UI (`game.py`,
-  `gofish/engine.py`), computer players (`ai.py`, `gofish/ai.py`) and a table scene
-  in `ui/` (`game_scene.py`, `gofish_scene.py`). The main menu's arrows switch games
+- `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack. Each has a rules engine
+  with no UI (`game.py`, `gofish/engine.py`, `blackjack/engine.py`), computer players
+  (`ai.py`, `gofish/ai.py`, `blackjack/ai.py`) and a table scene in `ui/`
+  (`game_scene.py`, `gofish_scene.py`, `blackjack_scene.py`). The main menu's arrows switch games
   (`ui/menus.py`, `GAMES`).
 - Multiplayer lives in `net/`. The host's engine is the only real game; guests get
   per-player snapshots with seats rotated so they're seat 0, plus a "Remote…Game"
   mirror that sends moves to the host. To add a game: a snapshot/events function,
   a Remote mirror, a Host session (`handle_action`, `player_left`, `flush`), a lobby
-  `GAMES` entry, and a scene that accepts `host`/`session`/`client`. `net/fish_net.py`
-  is the smallest example. Bump `VERSION` in `net/protocol.py` when the wire format
+  `GAMES` entry (host.py, menus.py, multiplayer.py picker), and a scene that accepts
+  `host`/`session`/`client`. `net/fish_net.py` and `net/bj_net.py` are good templates. Bump `VERSION` in `net/protocol.py` when the wire format
   changes.
 - Look and feel: everything is drawn in code (`ui/theme.py`, `ui/card_art.py`) in a
   handheld DS style. Use the theme's color roles so Customize works. Text uses the

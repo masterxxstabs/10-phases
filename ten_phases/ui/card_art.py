@@ -77,9 +77,14 @@ def _skip_symbol(surf, center, radius, color):
     pygame.draw.line(surf, color, (center[0] - dx, center[1] - dy), (center[0] + dx, center[1] + dy), w + 1)
 
 
+def _face(card) -> str:
+    """What's printed on a card: blackjack cards show A/J/Q/K, everything else its number."""
+    return getattr(card, "rank_label", None) or str(card.value)
+
+
 def render_card(card: Card | None, w: int, h: int) -> pygame.Surface:
     """Render a card face (or the back, if card is None)."""
-    key = ("back",) if card is None else (card.kind, card.color, card.value)
+    key = ("back",) if card is None else (card.kind, card.color, card.value, _face(card))
     key += (w, h)
     cached = _cache.get(key)
     if cached:
@@ -128,11 +133,11 @@ def render_card(card: Card | None, w: int, h: int) -> pygame.Surface:
         inner.fill(color)
         oval = _oval((iw, ih), fill=theme.CARD_WHITE)
         inner.blit(oval, oval.get_rect(center=icenter))
-        label = str(card.value)
-        size = big if card.value < 10 else int(big * (0.78 if w >= 60 else 0.62))
+        label = _face(card)
+        size = big if len(label) < 2 else int(big * (0.78 if w >= 60 else 0.62))
         _number(inner, label, icenter, size, color, shadow=(0, 0, 0), offset=max(2, size // 12),
                 outline=theme.CARD_BLACK)
-        if card.value in (6, 9):
+        if label in ("6", "9"):
             # Underline 6 and 9 so they read correctly upside down.
             ul_w = int(size * 0.32)
             pygame.draw.line(inner, theme.CARD_BLACK, (icenter[0] - ul_w // 2, icenter[1] + size * 0.42),
@@ -163,7 +168,7 @@ def _corner_skip(surf, pos, radius, flip):
 
 def card_with_shadow(card: Card | None, w: int, h: int, lift: int = 0) -> tuple[pygame.Surface, int]:
     """The card plus a flat offset shadow below it. Returns (surface, shadow_offset)."""
-    key = ("shadow", None if card is None else (card.kind, card.color, card.value), w, h, lift)
+    key = ("shadow", None if card is None else (card.kind, card.color, card.value, _face(card)), w, h, lift)
     cached = _cache.get(key)
     off = 4 + lift // 3
     if cached:

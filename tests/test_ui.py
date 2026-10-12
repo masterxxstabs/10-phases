@@ -178,4 +178,30 @@ def test_menu_switches_games_and_go_fish_plays(app):
     assert scene.game.game_over and scene.overlay == "game"
     assert app.settings.chip_bank == bank + 5 * len(scene.me.books)
     menu.switch_game(1)
-    assert app.settings.game == "10 PHASES"
+    assert app.settings.game == "BLACKJACK"
+    menu.switch_game(1)
+    assert app.settings.game == "10 PHASES"  # wraps around
+    menu.switch_game(-1)
+    assert app.settings.game == "BLACKJACK"
+
+
+def test_blackjack_plays_through_the_screen(app):
+    from ten_phases.blackjack.ai import BlackjackAI
+    from ten_phases.ui.blackjack_scene import BlackjackScene
+
+    scene = BlackjackScene(app)
+    scene.splash = None
+    me = BlackjackAI("Hard")
+    bank = app.settings.chip_bank
+    for _ in range(20000):
+        scene.update(0.2)
+        if scene.overlay == "game":
+            break
+        if scene.can_bet():
+            scene.do_bet()
+        if scene.my_turn():
+            scene.do_hint()
+            scene.act(me.choose_action(scene.game, 0))
+        scene.draw(app.screen)
+    assert scene.game.game_over and scene.overlay == "game"
+    assert app.settings.chip_bank == bank + scene.me.chips

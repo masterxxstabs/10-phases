@@ -7,6 +7,7 @@ import threading
 
 from .. import __version__
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
+from .bj_net import RemoteBlackjackGame
 from .fish_net import RemoteFishGame
 from .snapshot import RemoteGame
 
@@ -24,7 +25,7 @@ class ClientSession:
         self.host_name = ""
         self.members: list[dict] = []
         self.my_index = 0
-        self.game: RemoteGame | RemoteFishGame | None = None
+        self.game: RemoteGame | RemoteFishGame | RemoteBlackjackGame | None = None
         self.game_name = "10 PHASES"   # which card game the host picked
         threading.Thread(target=self._connect, daemon=True).start()
 
@@ -73,7 +74,8 @@ class ClientSession:
                 self.game_name = msg.get("game", self.game_name)
             elif t == "start":
                 self.game_name = msg.get("game", "10 PHASES")
-                self.game = RemoteFishGame(self.send) if self.game_name == "GO FISH" else RemoteGame(self.send)
+                self.game = {"GO FISH": RemoteFishGame, "BLACKJACK": RemoteBlackjackGame}.get(
+                    self.game_name, RemoteGame)(self.send)
             elif t == "to_lobby":
                 self.game = None
             elif t == "state" and self.game is not None:
