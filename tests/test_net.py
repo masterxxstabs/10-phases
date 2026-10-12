@@ -265,7 +265,7 @@ def test_full_blackjack_game_over_localhost():
         server.close()
 
 
-@pytest.mark.parametrize("game_name", ["10 PHASES", "GO FISH", "BLACKJACK", "POKER"])
+@pytest.mark.parametrize("game_name", ["10 PHASES", "GO FISH", "BLACKJACK", "POKER", "MONOPOLY"])
 def test_everyone_sees_everyone_elses_skins(game_name):
     server = HostServer("HOSTY", port=0, announce=False, game=game_name, skin=("neon", "galaxy"))
     try:

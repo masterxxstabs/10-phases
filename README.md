@@ -167,12 +167,30 @@ The fifth game on the main menu, for 3-6 players (computers fill empty seats). I
 - **Cards** come from the [REST Against Humanity](https://www.restagainsthumanity.com/) API (`/gql/`, falling back to `/api/graphql` and the REST API). They download once and are saved next to your settings, so later games work offline. Only the host needs them; guests get the cards in play from the host.
 - Card text: Cards Against Humanity, [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/2.0/), Cards Against Humanity LLC. This game is free and not affiliated with them.
 
+## Monopoly
+
+The sixth game on the main menu: the classic London board for 2-6 players (computers fill empty seats).
+- **Before the game** pick your token (car, hat, dog, ship, boot or cat) and the game length: 20, 40, 60 or 80 rounds.
+- **Your turn:** **ROLL DICE** (Space). Your token hops square by square. Doubles roll again; three doubles in a row sends you to jail.
+- **Buying:** land on an unowned property to **BUY** it, or send it to **AUCTION**, where everyone bids (+£1, +£10, +£50, +£100) until all but one pass.
+- **Rent:** pay the owner when you land on their property. A full colour set doubles the rent; stations and utilities count how many the owner has.
+- **Building and mortgages:** click your property on the board to open its deed. **BUILD** houses evenly across a full set, then a hotel. **SELL HOUSE** gets half back, **MORTGAGE** raises half the price (no rent while mortgaged) and **PAY OFF** costs the mortgage plus 10%.
+- **Trading:** on your turn press **TRADE**, pick a player, click the properties each side gives and add cash. Computers accept deals that are good for them.
+- **Jail:** roll doubles, pay £50, or use a Get Out of Jail Free card. On the third failed roll you pay £50 and move.
+- **Owing money:** if you can't pay, the game stops until you raise it (sell houses, mortgage, trade) and **PAY**, or go bankrupt. Everything you own goes to whoever you owed.
+- **Winning:** last player standing, or the richest (cash + property) after the last round. Every £50 you're worth is 1 chip for your Chip Bank.
+- **Animations:** dice tumble across the board, tokens hop (or fly to jail), cards flip over from their pile, coins fly between players, deeds fly to their buyer and houses pop up. Hold **Space** to speed them up; the buttons wait until the animation has caught up.
+- **Computer players:** Easy buys on a whim; Medium keeps a cash cushion and builds; Hard values colour sets and offers cash for the missing piece; Expert also keeps enough cash for the worst rent on the board.
+- **Multiplayer:** pick MONOPOLY in the lobby (**MONOPOLY OPTIONS** sets the rounds). Everyone sees the same board with themselves in the first row, and guests get their chosen token when it's free.
+- The board, prices, rents, cards and computer strategy follow [monopyly](https://github.com/richard-shepherd/monopyly) by Richard Shepherd (MIT License). MONOPOLY is a trademark of Hasbro; this free game isn't affiliated with them.
+
 ## Admin panel
 
-A password-protected panel for the game's owner. At any card table (10 Phases, Go Fish, Blackjack or Poker) press **F12** or **Ctrl+Shift+D** and enter the admin password. It stays unlocked until you close the game or press **LOCK**. After 3 wrong passwords it locks for 30 seconds.
+A password-protected panel for the game's owner. At any table (10 Phases, Go Fish, Blackjack, Poker, Cards Against Humanity or Monopoly) press **F12** or **Ctrl+Shift+D** and enter the admin password. It stays unlocked until you close the game or press **LOCK**. After 3 wrong passwords it locks for 30 seconds.
 
 - **See every hand:** every player's cards, plus the dealer's hidden card in Blackjack.
 - **Give a card:** press **GIVE** on a player, pick a color and number (or WILD/SKIP in 10 Phases), then **GIVE CARD**. In Blackjack it goes on their current hand. In Poker, **SWAP IN** replaces one of their two cards, and a card that's already in play is refused.
+- **Monopoly:** shows everyone's cash and properties. Give a player **+£100**, **+£500**, a random **PROPERTY** from the bank, or a **JAIL-FREE CARD**.
 - **Kick:** removes a guest from a game you host, and a computer takes their seat.
 - **+100 CHIP BANK** for testing the shop.
 - Solo games pause while the panel is open. In multiplayer, changes only work on the host, and guests see them right away. On a guest's copy the panel is view-only.
@@ -294,6 +312,7 @@ ten_phases/
   blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
   poker/        Texas Hold'em rules, hand ranking and side pots (engine.py), computer players and the Hint (ai.py)
   cah/          Cards Against Humanity: card download and cache (cards.py), rules (engine.py), computers (ai.py)
+  monopoly/     Monopoly: the board and cards (board.py), rules (engine.py), computer players (ai.py)
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
   skins.py      every card skin and its rarity, including the generated ones
   shop.py       card packs (odds, opening, duplicates) and equipping skins

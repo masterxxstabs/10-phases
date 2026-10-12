@@ -22,10 +22,11 @@ from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, cle
 from .bj_net import start_blackjack
 from .cah_net import start_cah
 from .fish_net import start_fish
+from .monopoly_net import start_monopoly
 from .poker_net import start_poker
 from .snapshot import events_for, snapshot_for, unrotate
 
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY")
 
 
 
@@ -49,6 +50,8 @@ class HostServer:
         self.ip_index = 0
         self.custom_ip: str | None = None
         self.cah: tuple | None = None   # (packs, CahOptions) for Cards Against Humanity, set by the lobby
+        self.monopoly_rounds = 40       # set by the lobby
+        self.token = "car"              # the host's Monopoly piece
         self.listener = self._listen(port)
         self.port = self.listener.getsockname()[1]
         self.running = True
@@ -195,6 +198,7 @@ class HostServer:
             k += 1
         conn.tag = name
         conn.skin = clean_skin(msg.get("skin"))
+        conn.token = msg.get("token") if isinstance(msg.get("token"), str) else ""
         self.guests.append(conn)
         conn.send({"t": "welcome", "name": name, "host": self.name})
         self.notices.append(f"{name} joined")
@@ -223,6 +227,15 @@ class HostServer:
             self.session.flush(force=True)
             return self.session
         self.in_game = True
+        if self.game == "MONOPOLY":
+            names = self._ai_names()
+            self.session = start_monopoly(self, names, [self._ai_level(k) for k in range(len(names))],
+                                          self.monopoly_rounds)
+            self.dress(self.session.game.players)
+            for g in self.guests:
+                g.send({"t": "start", "game": self.game})
+            self.session.flush(force=True)
+            return self.session
         if self.game in ("GO FISH", "BLACKJACK", "POKER"):
             names = self._ai_names()
             starter = {"GO FISH": start_fish, "BLACKJACK": start_blackjack, "POKER": start_poker}[self.game]

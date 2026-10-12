@@ -58,7 +58,7 @@ class PasswordInput(TextInput):
 
 def _kind(scene) -> str:
     return {"GameScene": "phases", "GoFishScene": "fish", "BlackjackScene": "blackjack",
-            "PokerScene": "poker", "CahScene": "cah"}.get(type(scene).__name__, "phases")
+            "PokerScene": "poker", "CahScene": "cah", "MonopolyScene": "mono"}.get(type(scene).__name__, "phases")
 
 
 VALUES = {"phases": (1, 12), "fish": (1, 12), "blackjack": (1, 13), "poker": (2, 14)}
@@ -71,6 +71,8 @@ def player_cards(scene, i: int) -> list:
         return [c for h in p.hands for c in h.cards]
     if kind == "poker":
         return list(p.hole)
+    if kind == "mono":
+        return []
     return list(p.hand)
 
 
@@ -125,6 +127,40 @@ def give_card(scene, i: int, card, slot: int = 0) -> str:
     if kind == "fish" and hasattr(g, "_collect_books"):
         g._collect_books(i)   # four of a kind becomes a book right away, as in play
     return f"Gave {p.name} the {card.label()}."
+
+
+def give_monopoly(scene, i: int, what: str) -> str:
+    """Monopoly has no hand of cards: give money, a property from the bank, or a Get Out of Jail Free card."""
+    from ..monopoly.board import SQUARES
+    g = scene.game
+    p = g.players[i]
+    if p.bankrupt:
+        raise ValueError(f"{p.name} is bankrupt.")
+    if what.startswith("cash"):
+        amount = int(what[4:])
+        p.cash += amount
+        return f"Gave {p.name} £{amount}. They have £{p.cash:,}."
+    if what == "property":
+        busy = set()
+        if g.phase == "buy":
+            busy.add(g.players[g.current].pos)
+        if g.auction:
+            busy.add(g.auction["sq"])
+        free = [k for k in range(40) if SQUARES[k].ownable and g.owner[k] is None and k not in busy]
+        if not free:
+            raise ValueError("The bank has no properties left to give.")
+        k = scene.rng.choice(free) if hasattr(scene, "rng") else free[0]
+        g.owner[k] = i
+        return f"Gave {p.name} {SQUARES[k].name}."
+    if what == "jail_card":
+        for deck in ("chance", "chest"):
+            card = next((c for c in g.decks[deck] if c.action == "goojf"), None)
+            if card:
+                g.decks[deck].remove(card)
+                p.goojf.append(deck)
+                return f"Gave {p.name} a Get Out of Jail Free card."
+        raise ValueError("Both Get Out of Jail Free cards are already out.")
+    raise ValueError("Unknown gift.")
 
 
 # --------------------------------------------------------------------------- the panel
@@ -312,6 +348,15 @@ class AdminPanel:
         y = PANEL.bottom - 128
         x = PANEL.x + 250
         self.picker = []
+        if kind == "mono":
+            gifts = (("+£100", "cash100"), ("+£500", "cash500"), ("PROPERTY", "property"),
+                     ("JAIL-FREE CARD", "jail_card"))
+            for n, (label, what) in enumerate(gifts):
+                b = Button((x + n * 196, y, 184, 48), label, lambda w=what: self._give_mono(w), "SUCCESS", "OUTLINE",
+                           16 if n < 3 else 14)
+                b.enabled = self.can_edit and self.target is not None
+                self.picker.append(b)
+            return
         if kind == "cah":
             for n, (label, what) in enumerate((("GIVE BLANK CARD", "blank"), ("GIVE RANDOM CARD", "random"))):
                 b = Button((x + n * 250, y, 236, 48), label, lambda w=what: self._give_cah(w), "SUCCESS", "OUTLINE", 16)
@@ -347,6 +392,20 @@ class AdminPanel:
         self.picker.append(give)
         if not (lo <= self.value <= hi):
             self.value = max(lo, min(hi, self.value))
+
+    def _give_mono(self, what: str):
+        if self.target is None:
+            return
+        try:
+            self.flash = give_monopoly(self.scene, self.target, what)
+        except ValueError as e:
+            self.flash = str(e)
+            sfx.play("error")
+            return
+        if hasattr(self.scene, "sync_view") and not getattr(self.scene, "animating", True):
+            self.scene.sync_view()
+        self._changed()
+        sfx.play("coin")
 
     def _give_cah(self, what: str):
         self.special = what
@@ -430,6 +489,9 @@ class AdminPanel:
         theme.face(surf, (r.x + 30, r.centery), 20, i)
         theme.ptext(surf, p.name if i or p.name == "YOU" else f"{p.name} (YOU)", (r.x + 58, r.y + 8), 18)
         role = "YOU" if i == 0 else "GUEST" if p.is_human else (p.difficulty or "COMPUTER").upper()
+        if _kind(s) == "mono":
+            self._draw_mono_row(surf, r, i, role)
+            return
         cards = player_cards(s, i)
         theme.ptext(surf, f"{role}  -  {len(cards)} CARD{'S' if len(cards) != 1 else ''}", (r.x + 58, r.y + 36),
                     12, theme.TEXT_DIM)
@@ -456,8 +518,42 @@ class AdminPanel:
         if kick:
             kick.draw(surf)
 
+    def _draw_mono_row(self, surf, r: pygame.Rect, i: int, role: str):
+        from ..monopoly.board import SETS, SQUARES
+        g = self.scene.game
+        p = g.players[i]
+        status = "BANKRUPT" if p.bankrupt else f"£{p.cash:,}" + ("  IN JAIL" if p.in_jail else "") + \
+            (f"  {len(p.goojf)} JAIL-FREE" if p.goojf else "")
+        theme.ptext(surf, f"{role}  -  {status}", (r.x + 58, r.y + 36), 12, theme.TEXT_DIM)
+        x = r.x + 300
+        for k in g.props_of(i):
+            box = pygame.Rect(x, r.y + 14, 14, 36)
+            col = SETS.get(SQUARES[k].group, (40, 40, 48) if SQUARES[k].kind == "station" else (200, 200, 210))
+            pygame.draw.rect(surf, col, box)
+            pygame.draw.rect(surf, theme.OUTLINE, box, 1)
+            if g.houses[k]:
+                theme.ptext(surf, "H" if g.houses[k] == 5 else str(g.houses[k]), box.center, 10, theme.CARD_WHITE,
+                            anchor="center")
+            if g.mortgaged[k]:
+                pygame.draw.line(surf, theme.OUTLINE, box.topleft, box.bottomright, 2)
+            x += 16
+            if x > r.right - 290:
+                break
+        give, kick = self.row_buttons[self._rows().index(i)]
+        give.draw(surf)
+        if kick:
+            kick.draw(surf)
+
     def _draw_picker(self, surf):
         kind = _kind(self.scene)
+        if kind == "mono":
+            y = PANEL.bottom - 128
+            theme.ptext(surf, "GIVE", (PANEL.x + 24, y + 4), 16, theme.ACCENT)
+            target = self.scene.game.players[self.target].name if self.target is not None else "nobody yet"
+            theme.ptext(surf, f"TO: {target}", (PANEL.x + 24, y + 28), 13, theme.TEXT_DIM)
+            for b in self.picker:
+                b.draw(surf)
+            return
         y = PANEL.bottom - 128
         theme.ptext(surf, "CARD TO GIVE", (PANEL.x + 24, y + 4), 16, theme.ACCENT)
         target = self.scene.game.players[self.target].name if self.target is not None else "nobody yet"

@@ -111,6 +111,14 @@ def smoke_test() -> None:
     app.running = True
     app.go(CahScene(app, packs=smoke_packs, options=CahOptions(blanks=3)))
     app.run(max_frames=90)
+    from .monopoly_scene import MonopolyScene
+    from .monopoly_setup import MonopolySetupScene
+    app.running = True
+    app.go(MonopolyScene(app))
+    app.run(max_frames=120)
+    app.running = True
+    app.go(MonopolySetupScene(app))
+    app.run(max_frames=20)
     from .. import shop
     from .pack_open import PackOpenScene
     from .shop_scene import ShopScene

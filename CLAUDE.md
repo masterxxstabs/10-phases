@@ -12,7 +12,8 @@
 ## How the project fits together
 
 - `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack, Poker, Cards Against Humanity (`cah/`,
-  `ui/cah_scene.py`, `ui/cah_setup.py`, `net/cah_net.py`), and Slots (single player). Each has a
+  `ui/cah_scene.py`, `ui/cah_setup.py`, `net/cah_net.py`), Monopoly (`monopoly/`, `ui/monopoly_scene.py`,
+  `ui/monopoly_setup.py`, `ui/monopoly_art.py`, `net/monopoly_net.py`), and Slots (single player). Each has a
   rules engine with no UI (`game.py`, `gofish/engine.py`, `blackjack/engine.py`, `poker/engine.py`), computer
   players (`ai.py`, `gofish/ai.py`, `blackjack/ai.py`, `poker/ai.py`) and a table scene in `ui/`
   (`game_scene.py`, `gofish_scene.py`, `blackjack_scene.py`, `poker_scene.py`). The main menu's arrows switch games
@@ -23,7 +24,7 @@
   a Remote mirror, a Host session (`handle_action`, `player_left`, `flush`), a lobby
   `GAMES` entry (host.py, menus.py, multiplayer.py picker), and a scene that accepts
   `host`/`session`/`client`. `net/fish_net.py`, `net/bj_net.py` and `net/poker_net.py` are good templates (poker
-  shares its move rules with its guest mirror through `PokerRules`). Bump `VERSION` in `net/protocol.py` when the wire format
+  shares its move rules with its guest mirror through `PokerRules`, Monopoly through `MonopolyRules`). Bump `VERSION` in `net/protocol.py` when the wire format
   changes.
 - Chips: games bank chips into `settings.chip_bank`. The Card Shop (`shop.py`, `ui/shop_scene.py`)
   sells card packs (`ui/pack_open.py` is the rip-and-flip opening, `ui/pack_art.py` its art and
@@ -52,3 +53,6 @@
 - Before pushing, run `python -m pytest -q` and `python -m pyflakes ten_phases tests tools`.
   For UI changes, drive the real scenes headless (`SDL_VIDEODRIVER=dummy`) and look at
   screenshots.
+- Monopoly: the engine runs instantly and emits `MEvent`s; `ui/monopoly_scene.py` replays them one at a time as
+  animations, and the action panel waits (`settled()`) until moves and cards have played out. Board, rents and
+  cards follow monopyly (MIT). Keep the whole-game invariant test in `tests/test_monopoly.py` passing.

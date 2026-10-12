@@ -44,7 +44,7 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "SLOTS")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "SLOTS")
 TITLES = {"CAH": "CARDS AGAINST HUMANITY"}
 SINGLE_PLAYER = ("SLOTS",)
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
@@ -79,8 +79,8 @@ class MenuScene(Scene):
 
     def _build_fan(self):
         rng = random.Random()
-        if self.game == "CAH":
-            self.fan = []   # drawn as CAH cards in draw()
+        if self.game in ("CAH", "MONOPOLY"):
+            self.fan = []   # drawn in draw()
         elif self.game == "SLOTS":
             self.fan = [None, None, None]   # three jackpot card backs
         elif self.game == "POKER":
@@ -135,7 +135,10 @@ class MenuScene(Scene):
         self.app.go(ShopScene(self.app))
 
     def _play(self):
-        if self.game == "CAH":
+        if self.game == "MONOPOLY":
+            from .monopoly_setup import MonopolySetupScene
+            self.app.go(MonopolySetupScene(self.app))
+        elif self.game == "CAH":
             from .cah_setup import CahSetupScene
             self.app.go(CahSetupScene(self.app))
         elif self.game == "SLOTS":
@@ -244,6 +247,8 @@ class MenuScene(Scene):
             for i, img in enumerate(cards):
                 img = pygame.transform.rotozoom(img, (1 - i) * 9, 1)
                 surf.blit(img, img.get_rect(center=(cx + (i - 1) * 120, 276 + abs(i - 1) * 8)))
+        if self.game == "MONOPOLY":
+            _draw_monopoly_fan(surf, cx, 276, self.clock)
         title = TITLES.get(self.game, self.game)
         theme.logo(surf, title, (cx + (40 if len(title) >= 14 else 0), 120), 92 if len(title) < 14 else 46,
                    angle=6 if len(title) < 14 else 3)
@@ -387,6 +392,18 @@ HOW_TO_CAH = [
     "Each point is worth 10 chips for your CHIP BANK.",
 ]
 
+HOW_TO_MONOPOLY = [
+    "Roll the dice and move around the board. Doubles roll again, but three doubles in a row is jail!",
+    "Land on an unowned property and you can BUY it. Don't want it? It goes to AUCTION and anyone can bid.",
+    "Land on someone else's property and you pay them rent. Own a whole colour set and the rent doubles.",
+    "With a full set, click your properties to BUILD houses (evenly), then a hotel. Rent shoots up!",
+    "Short of cash? Sell houses back for half, or MORTGAGE properties. You can't collect rent on mortgaged ones.",
+    "TRADE on your turn: swap properties and cash with anyone. Computers say yes to a good deal.",
+    "Pass GO to collect £200. In jail: roll doubles, pay £50, or use a Get Out of Jail Free card.",
+    "Can't pay what you owe and you're bankrupt. After the last round, the richest player wins.",
+    "Every £50 you're worth at the end is 1 chip for your CHIP BANK. Hold SPACE to speed things up.",
+]
+
 HOW_TO_SLOTS = [
     "Slots plays with your real CHIP BANK: every spin costs your bet, and wins go straight back in.",
     "Pick a bet (1, 5, 10 or 25), then pull the lever, press SPIN or hit Space.",
@@ -428,14 +445,14 @@ class HowToScene(Scene):
     def draw(self, surf):
         backdrop(surf, self.clock)
         title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES",
-                 "POKER": "POKER RULES", "CAH": "CARDS AGAINST HUMANITY"}.get(
+                 "POKER": "POKER RULES", "CAH": "CARDS AGAINST HUMANITY", "MONOPOLY": "MONOPOLY RULES"}.get(
             self.game, "HOW TO PLAY")
         theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
         rules = {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS, "POKER": HOW_TO_POKER,
-                 "CAH": HOW_TO_CAH}
+                 "CAH": HOW_TO_CAH, "MONOPOLY": HOW_TO_MONOPOLY}
         for line in rules.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
@@ -467,6 +484,11 @@ class HowToScene(Scene):
             _draw_cah_panel(surf, panel)
             self.back.draw(surf)
             status_bar(surf, f"Cards Against Humanity  -  10 Phases v{__version__}")
+            return
+        if self.game == "MONOPOLY":
+            _draw_monopoly_panel(surf, panel, self.clock)
+            self.back.draw(surf)
+            status_bar(surf, f"Monopoly  -  10 Phases v{__version__}")
             return
         if self.game == "POKER":
             _draw_poker_panel(surf, panel)
@@ -519,6 +541,38 @@ def _draw_blackjack_panel(surf, panel):
         theme.ptext(surf, head, (panel.x + 24, panel.y + 260 + k * 70), 18, theme.ACCENT)
         theme.ptext(surf, line, (panel.x + 24, panel.y + 290 + k * 70), 15, theme.TEXT_DIM)
     theme.logo(surf, "21!", (panel.centerx, panel.bottom - 50), 52, angle=6)
+
+
+def _draw_monopoly_fan(surf, cx, cy, clock):
+    """Title deeds, dice and a token for the main menu."""
+    from . import monopoly_art as art
+    for k, (sq, angle) in enumerate(((37, 14), (39, 0), (24, -14))):
+        img = pygame.transform.rotozoom(art.deed(sq, 220), angle, 0.52)
+        surf.blit(img, img.get_rect(center=(cx + (k - 1) * 104, cy + abs(k - 1) * 10)))
+    for k, v in enumerate((6, 6)):
+        img = pygame.transform.rotate(art.die(v, 46), 20 - k * 35 + math.sin(clock * 2 + k) * 6)
+        surf.blit(img, img.get_rect(center=(cx + 190 + k * 40, cy + 40 - k * 20)))
+    tok = art.token("car", art.TOKEN_COLORS["car"], 64)
+    surf.blit(tok, tok.get_rect(center=(cx - 200, cy + 34 + int(math.sin(clock * 4) * 5))))
+
+
+def _draw_monopoly_panel(surf, panel, clock):
+    from . import monopoly_art as art
+    theme.ptext(surf, "BUILD AN EMPIRE", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+    img = pygame.transform.rotozoom(art.deed(39, 220, "YOU", 3, False, True), 4, 0.9)
+    surf.blit(img, img.get_rect(center=(panel.x + 130, panel.y + 200)))
+    for k, kind in enumerate(("car", "hat", "dog", "ship", "boot", "cat")):
+        tok = art.token(kind, art.TOKEN_COLORS[kind], 48)
+        bob = math.sin(clock * 4 + k) * 4
+        surf.blit(tok, tok.get_rect(center=(panel.x + 280 + (k % 2) * 70, panel.y + 90 + (k // 2) * 70 + bob)))
+    for k in range(4):
+        h = art.house(22, hotel=k == 3)
+        surf.blit(h, h.get_rect(center=(panel.x + 270 + k * 34, panel.y + 330)))
+    rows = [("MAYFAIR, 3 HOUSES", "£1,400 rent!"), ("PASS GO", "Collect £200"),
+            ("BASED ON MONOPYLY", "github.com/richard-shepherd/monopyly")]
+    for k, (head, line) in enumerate(rows):
+        theme.ptext(surf, head, (panel.x + 24, panel.y + 380 + k * 52), 17, theme.ACCENT)
+        theme.ptext(surf, line, (panel.x + 24, panel.y + 404 + k * 52), 13, theme.TEXT_DIM)
 
 
 def _draw_poker_panel(surf, panel):

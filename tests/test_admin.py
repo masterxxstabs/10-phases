@@ -163,3 +163,46 @@ def test_host_can_kick_a_guest_and_guests_cannot_edit(app, unlocked):
         assert guest.status == "closed" and "removed" in (guest.error or "")
     finally:
         server.close()
+
+
+def test_admin_at_a_networked_monopoly_table(app, unlocked):
+    from ten_phases.net.client import ClientSession
+    from ten_phases.net.host import HostServer
+    from ten_phases.ui.monopoly_scene import MonopolyScene
+
+    server = HostServer("HOST", port=0, announce=False, game="MONOPOLY")
+    try:
+        guest = ClientSession("PAL", "127.0.0.1", server.port, server.key)
+        end = time.monotonic() + 5
+        while guest.status != "joined" and time.monotonic() < end:
+            server.pump()
+            guest.poll()
+            time.sleep(0.01)
+        session = server.start_game()
+        while not (guest.game and guest.game.players) and time.monotonic() < end:
+            server.pump()
+            guest.poll()
+            time.sleep(0.01)
+        host_scene = MonopolyScene(app, host=server, session=session)
+        guest_scene = MonopolyScene(app, client=guest)
+        assert not guest_scene.admin.can_edit
+        guest_scene.admin.target = 0
+        guest_scene.admin._layout()
+        assert not any(b.enabled for b in guest_scene.admin.picker)
+        # The host gives the guest £500; the guest sees it.
+        host_scene.admin.open = True
+        host_scene.admin._pick_target(1)
+        host_scene.admin._give_mono("cash500")
+        host_scene.draw(app.screen)
+        while time.monotonic() < end and guest.game.players[0].cash != 2000:
+            guest.poll()
+            time.sleep(0.01)
+        assert guest.game.players[0].cash == 2000
+        host_scene.admin._layout()
+        _, kick = host_scene.admin.row_buttons[1]
+        assert kick is not None
+        host_scene.admin._kick(1)
+        assert not server.guests and session.game.players[1].is_human is False
+        assert 1 in session.ais
+    finally:
+        server.close()

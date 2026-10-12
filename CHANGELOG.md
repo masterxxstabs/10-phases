@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.11.0
+
+- New game: Monopoly! Arrow over to it on the main menu, pick your token and how many rounds to play
+- Everything is animated: dice tumble, tokens hop square by square (or fly to jail), cards flip, coins fly and houses pop up. Hold Space to speed it up
+- Buy, auction, build houses and hotels, mortgage, and trade with anyone. Computers from Easy to Expert bargain back
+- Works in multiplayer for up to 6 players: pick MONOPOLY in the lobby (everyone needs this version to play together)
+
 ## 1.10.0
 
 - New game: Cards Against Humanity! Arrow over to it on the main menu (it's for adults)
