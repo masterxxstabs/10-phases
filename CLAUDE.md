@@ -6,10 +6,12 @@
   network multiplayer (host/join via invite code, nearby games, lobby, computer
   players filling seats) from the start, the same way 10 Phases and Go Fish do,
   unless the owner explicitly says otherwise for that game.
+  - Exception the owner asked for: **Slots is single player** (it bets the real Chip Bank).
+    Single-player games go in `SINGLE_PLAYER` in `ui/menus.py`.
 
 ## How the project fits together
 
-- `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack. Each has a rules engine
+- `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack, and Slots (single player). Each has a rules engine
   with no UI (`game.py`, `gofish/engine.py`, `blackjack/engine.py`), computer players
   (`ai.py`, `gofish/ai.py`, `blackjack/ai.py`) and a table scene in `ui/`
   (`game_scene.py`, `gofish_scene.py`, `blackjack_scene.py`). The main menu's arrows switch games
@@ -21,6 +23,8 @@
   `GAMES` entry (host.py, menus.py, multiplayer.py picker), and a scene that accepts
   `host`/`session`/`client`. `net/fish_net.py` and `net/bj_net.py` are good templates. Bump `VERSION` in `net/protocol.py` when the wire format
   changes.
+- Chips: games bank chips into `settings.chip_bank`. The Card Shop (`shop.py`, `ui/shop_scene.py`)
+  sells skins that `ui/card_art.py` draws via `theme.FACE_STYLE` / `theme.BACK_STYLE`.
 - Look and feel: everything is drawn in code (`ui/theme.py`, `ui/card_art.py`) in a
   handheld DS style. Use the theme's color roles so Customize works. Text uses the
   bundled pixel font through `theme.ptext`.

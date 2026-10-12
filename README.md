@@ -138,6 +138,26 @@ Return per chip bet over 20,000 simulated hands: Easy −6.7%, Medium −4.6%, H
 
 Hovering a seat shows that player's chips, net for the game, current hands and recent results.
 
+## Card Shop
+
+The **SHOP** button under your Chip Bank opens the shop. Spend chips on card skins:
+
+| | Skins (price in chips) |
+|---|---|
+| **Card fronts** | Classic (free), Bubble 60, Diamond 90, Minimal 120, Neon 250, Gold 400 |
+| **Card backs** | Classic (free), Checker 50, Racing Stripes 75, Starry Night 150, Neon Glow 200, Galaxy 300, Gold Edition 500 |
+
+- Every item shows a live preview. Buying takes a confirm click, and owned skins can be equipped any time.
+- Skins are cosmetic and only change your own screen. They work in every game, and the card backs use your Customize card-back color.
+
+## Slots
+
+**LUCKY 10 SLOTS** is the 4th stop on the main menu. Unlike the other games it's **single player** on purpose, and it plays with your real Chip Bank:
+- **Betting:** bet 1, 5, 10 or 25, then pull the lever, press **SPIN** or hit Space.
+- **Winning:** match three symbols on the payline. **WILD** counts as any symbol except the jackpot, and three **10 PHASES** cards pay **300×**.
+- **Small wins:** two cherries pay 2×, and a cherry on the first reel gives your bet back.
+- **Odds:** the machine returns 95.0% of what's bet over time (the exact figure is computed over every reel combination). About 37% of spins win something.
+
 ## Knowing your phase
 
 - **Your Phase board** (middle right) shows your phase in big letters and a 10-step tracker. It has a slot for each group you need, such as "SET OF 3". With Hints on, each slot fills with the cards you already have toward it and shows your progress (for example "2/3"). Once you lay down, your groups sit in those slots, and you can click them to add more cards.
@@ -227,6 +247,8 @@ ten_phases/
   ai.py         computer players and difficulty profiles
   gofish/       Go Fish rules (engine.py) and computer players (ai.py)
   blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
+  slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
+  shop.py       card shop catalog, buying and equipping skins
   names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions

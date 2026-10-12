@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.6.0
+
+- New Card Shop: spend your Chip Bank on card skins (6 card fronts, 7 card backs) from the SHOP button
+- New Lucky 10 Slots: a single-player slot machine that bets real Chip Bank chips (jackpot pays 300x!)
+- Skins show up in every game, and even on the slot machine's jackpot symbol
+
 ## 1.5.0
 
 - New game: Blackjack! Arrow over to it on the main menu

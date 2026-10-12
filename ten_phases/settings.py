@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 SETTINGS_PATH = Path.home() / ".ten_phases_settings.json"
@@ -28,6 +28,9 @@ class Settings:
     auto_update: bool = True
     chip_bank: int = 0   # chips kept from finished games
     game: str = "10 PHASES"   # which game the main menu shows
+    owned_items: list = field(default_factory=lambda: ["face:classic", "back:classic"])  # shop purchases
+    face_style: str = "classic"
+    back_style: str = "classic"
     # Look
     table_color: str = DEFAULT_TABLE
     accent: str = "Yellow"
@@ -66,7 +69,14 @@ class Settings:
             s.text_style = "Pixel"
         if not (isinstance(s.table_color, str) and len(s.table_color) == 7 and s.table_color.startswith("#")):
             s.table_color = DEFAULT_TABLE
-        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK"):
+        from .shop import BY_ID
+        if not isinstance(s.owned_items, list):
+            s.owned_items = []
+        s.owned_items = sorted({i for i in s.owned_items if i in BY_ID} | {"face:classic", "back:classic"})
+        for attr, kind in (("face_style", "face"), ("back_style", "back")):
+            if f"{kind}:{getattr(s, attr)}" not in s.owned_items:
+                setattr(s, attr, "classic")
+        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "SLOTS"):
             s.game = "10 PHASES"
         s.opponents = max(1, min(5, int(s.opponents)))
         s.chip_bank = max(0, int(s.chip_bank)) if isinstance(s.chip_bank, (int, float)) else 0

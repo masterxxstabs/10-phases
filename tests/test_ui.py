@@ -177,12 +177,16 @@ def test_menu_switches_games_and_go_fish_plays(app):
         scene.draw(app.screen)
     assert scene.game.game_over and scene.overlay == "game"
     assert app.settings.chip_bank == bank + 5 * len(scene.me.books)
-    menu.switch_game(1)
-    assert app.settings.game == "BLACKJACK"
-    menu.switch_game(1)
-    assert app.settings.game == "10 PHASES"  # wraps around
+    from ten_phases.ui.menus import GAMES
+    seen = [app.settings.game]
+    for _ in range(len(GAMES)):
+        menu.switch_game(1)
+        seen.append(app.settings.game)
+    assert seen[0] == seen[-1] == "GO FISH"          # a full lap wraps around
+    assert sorted(set(seen)) == sorted(GAMES)
     menu.switch_game(-1)
-    assert app.settings.game == "BLACKJACK"
+    assert app.settings.game == GAMES[GAMES.index("GO FISH") - 1]
+    app.settings.game = "10 PHASES"
 
 
 def test_blackjack_plays_through_the_screen(app):
@@ -205,3 +209,32 @@ def test_blackjack_plays_through_the_screen(app):
         scene.draw(app.screen)
     assert scene.game.game_over and scene.overlay == "game"
     assert app.settings.chip_bank == bank + scene.me.chips
+
+
+def test_slots_bank_accounting_through_the_screen(app):
+    from ten_phases.ui.menus import MenuScene
+    from ten_phases.ui.slots_scene import SlotsScene
+
+    app.settings.chip_bank = 200
+    menu = MenuScene(app)
+    while menu.game != "SLOTS":
+        menu.switch_game(1)
+    menu.draw(app.screen)
+    assert not menu.btn_multi.enabled          # slots is single player
+    menu._play()
+    scene = app.scene
+    assert isinstance(scene, SlotsScene)
+    expected = 200
+    for _ in range(25):
+        scene.spin()
+        for _ in range(300):
+            scene.update(1 / 30)
+            if scene.spinning is None:
+                break
+        expected += scene.result.win - scene.result.bet
+        scene.draw(app.screen)
+    assert app.settings.chip_bank == expected
+    app.settings.chip_bank = 0
+    scene.spin()
+    assert scene.spinning is None              # can't spin with no chips
+    app.settings.game = "10 PHASES"

@@ -54,6 +54,8 @@ CARD_BLACK = (28, 28, 32)
 CARD_WHITE = (255, 255, 255)
 
 CARD_BACK = (232, 46, 52)
+FACE_STYLE = "classic"   # card front skin (bought in the shop)
+BACK_STYLE = "classic"   # card back skin
 PIXEL_TEXT = True
 SPARKLES = True
 
@@ -437,6 +439,8 @@ def apply(settings) -> None:
     CARD_COLORS.update(CARD_PALETTES.get(settings.card_palette, CARD_PALETTES["Classic"]))
     g["PIXEL_TEXT"] = settings.text_style != "Smooth"
     g["SPARKLES"] = bool(settings.sparkles)
+    g["FACE_STYLE"] = getattr(settings, "face_style", "classic")
+    g["BACK_STYLE"] = getattr(settings, "back_style", "classic")
     clear_caches()
 
 

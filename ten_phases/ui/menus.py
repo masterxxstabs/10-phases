@@ -44,7 +44,8 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "SLOTS")
+SINGLE_PLAYER = ("SLOTS",)
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
 
@@ -62,6 +63,8 @@ class MenuScene(Scene):
             Button((cx - 150, 686, 300, 46), "QUIT", app.quit),
         ]
         self.btn_multi = self.buttons[1]
+        self.btn_shop = Button((20, 106, 250, 44), "SHOP", self._shop, size=18, **PRIMARY)
+        self.buttons.append(self.btn_shop)
         self.game = app.settings.game if app.settings.game in GAMES else GAMES[0]
         self.slide = 0.0          # -1..1 while the title/fan slides after switching games
         self._build_fan()
@@ -75,7 +78,9 @@ class MenuScene(Scene):
 
     def _build_fan(self):
         rng = random.Random()
-        if self.game == "BLACKJACK":
+        if self.game == "SLOTS":
+            self.fan = [None, None, None]   # three jackpot card backs
+        elif self.game == "BLACKJACK":
             from ..blackjack.engine import bj_card
             cols = rng.sample(COLORS, 4)
             self.fan = [bj_card(cols[0], 1), bj_card(cols[1], 13), bj_card(cols[2], 12), bj_card(cols[3], 11),
@@ -116,8 +121,15 @@ class MenuScene(Scene):
         from .customize import CustomizeScene
         self.app.go(CustomizeScene(self.app))
 
+    def _shop(self):
+        from .shop_scene import ShopScene
+        self.app.go(ShopScene(self.app))
+
     def _play(self):
-        if self.game == "BLACKJACK":
+        if self.game == "SLOTS":
+            from .slots_scene import SlotsScene
+            self.app.go(SlotsScene(self.app))
+        elif self.game == "BLACKJACK":
             from .blackjack_scene import BlackjackScene
             self.app.go(BlackjackScene(self.app))
         elif self.game == "GO FISH":
@@ -219,6 +231,10 @@ class MenuScene(Scene):
             pygame.draw.circle(surf, theme.ACCENT if name == self.game else theme.PANEL_LIGHT, dot, 6)
         s = self.app.settings
         info = f"{s.opponents} OPPONENT{'S' if s.opponents > 1 else ''}  -  {s.difficulty.upper()}"
+        solo = self.game in SINGLE_PLAYER
+        self.btn_multi.enabled = not solo
+        self.btn_multi.label = "SINGLE PLAYER GAME" if solo else "MULTIPLAYER"
+        self.btn_multi.size = 14 if solo else 20
         for b in self.buttons:
             b.draw(surf)
         self._draw_update(surf)
@@ -323,6 +339,16 @@ HOW_TO_BLACKJACK = [
     "Stuck? HINT shows the perfect basic-strategy move and why. Keys: H hit, S stand, D double, P split.",
 ]
 
+HOW_TO_SLOTS = [
+    "Slots plays with your real CHIP BANK: every spin costs your bet, and wins go straight back in.",
+    "Pick a bet (1, 5, 10 or 25), then pull the lever, press SPIN or hit Space.",
+    "Line up three matching symbols on the red payline. WILD counts as any symbol except the jackpot.",
+    "Three 10 PHASES cards is the JACKPOT: 300 times your bet!",
+    "Any two cherries pay 2x, and a cherry on the first reel gives your bet back.",
+    "Over time the machine pays back about 95% of what's bet, so it's for fun, not profit.",
+    "Out of chips? Win more playing 10 Phases, Go Fish or Blackjack.",
+]
+
 HOW_TO_FISH = [
     "Collect books: all four colors of one number (like a red, blue, green and yellow 7).",
     "On your turn, click a card in your hand, then click a player to ask them for that number.",
@@ -353,12 +379,13 @@ class HowToScene(Scene):
 
     def draw(self, surf):
         backdrop(surf, self.clock)
-        title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES"}.get(self.game, "HOW TO PLAY")
+        title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES"}.get(
+            self.game, "HOW TO PLAY")
         theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
-        for line in {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK}.get(self.game, HOW_TO):
+        for line in {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS}.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
                 theme.text(surf, chunk, (left.x + 44, y), 17, theme.TEXT, bold=False)
@@ -370,6 +397,20 @@ class HowToScene(Scene):
             self._draw_fish_panel(surf, panel)
             self.back.draw(surf)
             status_bar(surf, f"Go Fish  -  10 Phases v{__version__}")
+            return
+        if self.game == "SLOTS":
+            from .slots_scene import symbol_surface
+            from ..slots.engine import JACKPOT, SEVEN, WILD
+            theme.ptext(surf, "THE JACKPOT", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+            for k, sym in enumerate((JACKPOT,) * 3):
+                surf.blit(symbol_surface(sym, 110), (panel.x + 40 + k * 120, panel.y + 60))
+            theme.ptext(surf, "300x YOUR BET", (panel.centerx, panel.y + 200), 26, theme.ACCENT, anchor="center")
+            for k, sym in enumerate((WILD, SEVEN)):
+                surf.blit(symbol_surface(sym, 80), (panel.x + 40, panel.y + 250 + k * 100))
+            theme.ptext(surf, "WILD = ANY SYMBOL", (panel.x + 140, panel.y + 280), 18)
+            theme.ptext(surf, "THREE 7s = 25x", (panel.x + 140, panel.y + 380), 18)
+            self.back.draw(surf)
+            status_bar(surf, f"Slots  -  10 Phases v{__version__}")
             return
         if self.game == "BLACKJACK":
             _draw_blackjack_panel(surf, panel)
