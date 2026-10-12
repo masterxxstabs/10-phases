@@ -211,10 +211,6 @@ class MenuScene(Scene):
             pygame.draw.circle(surf, theme.ACCENT if name == self.game else theme.PANEL_LIGHT, dot, 6)
         s = self.app.settings
         info = f"{s.opponents} OPPONENT{'S' if s.opponents > 1 else ''}  -  {s.difficulty.upper()}"
-        fish = self.game == "GO FISH"
-        self.btn_multi.enabled = not fish
-        self.btn_multi.label = "MULTIPLAYER" if not fish else "MULTIPLAYER (10 PHASES)"
-        self.btn_multi.size = 20 if not fish else 14
         for b in self.buttons:
             b.draw(surf)
         self._draw_update(surf)

@@ -45,15 +45,23 @@ class Bubble:
 
 
 class GoFishScene(Scene):
-    def __init__(self, app):
+    """Local by default; pass `host` + `session` to host a network game, or `client` to join one."""
+
+    def __init__(self, app, host=None, session=None, client=None):
         super().__init__(app)
         s = app.settings
-        diffs = s.opponent_difficulties()
-        names = pick_ai_names(len(diffs), taken=["YOU", s.player_name])
-        players = [FishPlayer("YOU", is_human=True)]
-        players += [FishPlayer(n, difficulty=d) for n, d in zip(names, diffs)]
-        self.game = GoFishGame(players)
-        self.ais = {i + 1: GoFishAI(d) for i, d in enumerate(diffs)}
+        self.host, self.session, self.client = host, session, client
+        if session is not None:
+            self.game, self.ais = session.game, session.ais
+        elif client is not None:
+            self.game, self.ais = client.game, {}
+        else:
+            diffs = s.opponent_difficulties()
+            names = pick_ai_names(len(diffs), taken=["YOU", s.player_name])
+            players = [FishPlayer("YOU", is_human=True)]
+            players += [FishPlayer(n, difficulty=d) for n, d in zip(names, diffs)]
+            self.game = GoFishGame(players)
+            self.ais = {i + 1: GoFishAI(d) for i, d in enumerate(diffs)}
         self.hint_ai = GoFishAI("Expert", random.Random(0))
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -83,8 +91,24 @@ class GoFishScene(Scene):
         return self.game.players[HUMAN]
 
     @property
+    def networked(self) -> bool:
+        return self.host is not None or self.client is not None
+
+    @property
     def busy(self) -> bool:
-        return bool(self.anims) or self.splash is not None or self.overlay is not None
+        return (bool(self.anims) or self.splash is not None or self.overlay is not None
+                or getattr(self.game, "pending", False))
+
+    @property
+    def flow_blocked(self) -> bool:
+        """Computers wait during animations; in network games the pause menu doesn't stop play."""
+        if self.anims or self.splash is not None:
+            return True
+        return self.overlay is not None and not (self.overlay == "pause" and self.networked)
+
+    def role(self, i: int):
+        p = self.game.players[i]
+        return (p.difficulty.upper(), DIFF_COLORS[p.difficulty]) if p.difficulty else ("PLAYER", theme.CARD_WHITE)
 
     @property
     def my_turn(self) -> bool:
@@ -158,7 +182,9 @@ class GoFishScene(Scene):
             k = ev.kind
             if k == "ask":
                 who = self.name(ev.target).title() if ev.target != HUMAN else "you"
-                self.bubble(ev.player, f"GOT ANY {plural(ev.value)}, {self.name(ev.target)}?")
+                ask = f"GOT ANY {plural(ev.value)}?" if ev.target == HUMAN else \
+                    f"GOT ANY {plural(ev.value)}, {self.name(ev.target)}?"
+                self.bubble(ev.player, ask)
                 self.say(f"{self.name(ev.player).title()} asked {who} for {plural(ev.value)}", theme.TEXT_DIM)
                 sfx.play("click")
             elif k == "give":
@@ -251,6 +277,41 @@ class GoFishScene(Scene):
         self._consume_events()
         self.ai_timer = self.delay * 1.4 + 0.5
 
+    # ================================================================== network
+
+    def _pump_network(self):
+        if self.host is not None:
+            self.host.pump()
+            while self.session.notices:
+                self.say(self.session.notices.pop(0), theme.DANGER)
+                sfx.play("skip")
+        if self.client is not None:
+            for msg in self.client.poll():
+                t = msg["t"]
+                if t == "error":
+                    self.error(msg.get("msg", "That move wasn't allowed."))
+                elif t == "notice":
+                    self.say(msg.get("msg", ""), theme.DANGER)
+                    sfx.play("skip")
+                elif t == "to_lobby":
+                    self.client.game = None
+                    from .multiplayer import GuestLobbyScene
+                    self.app.go(GuestLobbyScene(self.app, self.client))
+                    return
+            if self.client.status in ("closed", "failed") and self.overlay != "disconnected":
+                self._set_overlay("disconnected")
+
+    def leave_network(self):
+        if self.host is not None:
+            self.host.close()
+        if self.client is not None:
+            self.client.leave()
+
+    def to_lobby(self):
+        from .multiplayer import HostLobbyScene
+        self.host.back_to_lobby()
+        self.app.go(HostLobbyScene(self.app, self.host))
+
     # ================================================================== overlays
 
     def _set_overlay(self, kind: str | None):
@@ -265,14 +326,27 @@ class GoFishScene(Scene):
                 self._banked = len(self.me.books) * CHIPS_PER_BOOK
                 self.app.settings.chip_bank += self._banked
                 self.app.settings.save()
-            self.overlay_buttons = [
-                Button((cx - 290, 650, 270, 58), "PLAY AGAIN", lambda: self.app.go(GoFishScene(self.app)), size=22,
-                       **primary),
-                Button((cx + 20, 650, 270, 58), "MAIN MENU", self.to_menu, size=22),
-            ]
+            if self.host is not None:
+                again = Button((cx - 290, 650, 270, 58), "BACK TO LOBBY", self.to_lobby, size=20, **primary)
+            elif self.client is not None:
+                again = Button((cx - 290, 650, 270, 58), "WAIT FOR HOST", lambda: None, size=18)
+                again.enabled = False
+            else:
+                again = Button((cx - 290, 650, 270, 58), "PLAY AGAIN", lambda: self.app.go(GoFishScene(self.app)),
+                               size=22, **primary)
+            self.overlay_buttons = [again, Button((cx + 20, 650, 270, 58), "MAIN MENU", self.to_menu, size=22)]
+        elif kind == "disconnected":
+            sfx.play("error")
+            self.overlay_buttons = [Button((cx - 140, 470, 280, 58), "MAIN MENU", self.to_menu, size=22, **primary)]
         elif kind == "pause":
-            options = [("RESUME", lambda: self._set_overlay(None)), ("CUSTOMIZE", self.customize),
-                       ("RESTART", lambda: self.app.go(GoFishScene(self.app))), ("MAIN MENU", self.to_menu)]
+            resume = lambda: self._set_overlay(None)  # noqa: E731
+            if self.host is not None:
+                options = [("RESUME", resume), ("END GAME", self.to_menu)]
+            elif self.client is not None:
+                options = [("RESUME", resume), ("CUSTOMIZE", self.customize), ("LEAVE GAME", self.to_menu)]
+            else:
+                options = [("RESUME", resume), ("CUSTOMIZE", self.customize),
+                           ("RESTART", lambda: self.app.go(GoFishScene(self.app))), ("MAIN MENU", self.to_menu)]
             self.overlay_buttons = [Button((cx - 140, 300 + k * 68, 280, 56), label, fn, size=22 if k == 0 else 20,
                                            **(primary if k == 0 else {})) for k, (label, fn) in enumerate(options)]
         else:
@@ -283,6 +357,7 @@ class GoFishScene(Scene):
         self.app.go(CustomizeScene(self.app, back=lambda: self.app.go(self)))
 
     def to_menu(self):
+        self.leave_network()
         from .menus import MenuScene
         self.app.go(MenuScene(self.app))
 
@@ -326,6 +401,9 @@ class GoFishScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self._pump_network()
+        if self.game.events:
+            self._consume_events()
         for a in self.anims:
             a.t += dt
         self.anims = [a for a in self.anims if not a.done]
@@ -341,7 +419,7 @@ class GoFishScene(Scene):
             self._set_overlay("game")
             return
         g = self.game
-        if self.busy or g.game_over or g.current == HUMAN:
+        if self.flow_blocked or g.game_over or g.current not in self.ais:
             return
         self.ai_timer -= dt
         if self.ai_timer <= 0:
@@ -409,7 +487,8 @@ class GoFishScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
         theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20)
-        self._chip(surf, p.difficulty.upper(), (r.x + 60, r.y + 34), DIFF_COLORS[p.difficulty])
+        label, color = self.role(i)
+        self._chip(surf, label, (r.x + 60, r.y + 34), color)
         cnt = theme.ptext(surf, str(len(p.hand)), (r.right - 12, r.y + 8), 18, anchor="topright")
         theme.mini_card_icon(surf, (cnt.x - 20, r.y + 9))
         inner = pygame.Rect(r.x + 8, r.y + 60, r.w - 16, r.h - 66)
@@ -556,7 +635,7 @@ class GoFishScene(Scene):
         theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
         theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
         theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
-        self._chip(surf, p.difficulty.upper(), (rect.x + 72, rect.y + 44), DIFF_COLORS[p.difficulty], size=12)
+        self._chip(surf, self.role(i)[0], (rect.x + 72, rect.y + 44), self.role(i)[1], size=12)
         theme.ptext(surf, f"{len(p.books)} BOOKS", (rect.right - 18, rect.y + 12), 26, theme.ACCENT, anchor="topright")
         theme.ptext(surf, f"{len(p.hand)} CARD{'S' if len(p.hand) != 1 else ''} IN HAND", (rect.right - 18, rect.y + 46), 14, theme.TEXT_DIM,
                     anchor="topright")
@@ -594,6 +673,14 @@ class GoFishScene(Scene):
         if self.overlay == "pause":
             theme.panel(surf, (cx - 200, 200, 400, 120 + 68 * len(self.overlay_buttons)))
             theme.logo(surf, "PAUSED", (cx, 250), 40, angle=4)
+            if self.networked:
+                theme.ptext(surf, "The game keeps going while you're here.", (cx, 290), 12, theme.TEXT_DIM,
+                            anchor="center")
+        elif self.overlay == "disconnected":
+            theme.panel(surf, (cx - 330, 250, 660, 300))
+            theme.logo(surf, "DISCONNECTED", (cx, 320), 44, angle=4)
+            reason = (self.client.error if self.client else None) or "The connection was lost."
+            theme.ptext(surf, reason, (cx, 400), 16, anchor="center")
         else:
             panel = pygame.Rect(cx - 400, 90, 800, 640)
             theme.panel(surf, panel)

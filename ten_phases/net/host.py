@@ -18,20 +18,24 @@ from ..names import AI_NAMES
 from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
     local_ips, new_room_key
+from .fish_net import start_fish
 from .snapshot import events_for, snapshot_for, unrotate
+
+GAMES = ("10 PHASES", "GO FISH")
 
 
 
 class HostServer:
-    def __init__(self, name: str, port: int = GAME_PORT, announce: bool = True):
+    def __init__(self, name: str, port: int = GAME_PORT, announce: bool = True, game: str = "10 PHASES"):
         self.name = clean_name(name, "HOST")
+        self.game = game if game in GAMES else GAMES[0]   # which card game this lobby plays
         self.key = new_room_key()
         self.inbox: queue.Queue = queue.Queue()
         self.guests: list[Connection] = []      # joined, in seat order
         self.ai_count = 0
         self.ai_level = "Medium"
         self.in_game = False
-        self.session: HostSession | None = None
+        self.session = None   # HostSession (10 Phases) or HostFishSession (Go Fish) while playing
         self.notices: list[str] = []
         # Shuffled once per lobby so the computer names stay put while you set things up.
         self._ai_pool = random.sample(AI_NAMES, len(AI_NAMES))
@@ -71,7 +75,7 @@ class HostServer:
     def _beacon_info(self):
         if self.in_game or not self.running or self.seats_free() <= 0:
             return None
-        return {"name": self.name, "app": __version__, "ip": self.address, "port": self.port, "key": self.key,
+        return {"name": self.name, "game": self.game, "app": __version__, "ip": self.address, "port": self.port, "key": self.key,
                 "players": 1 + len(self.guests), "max": MAX_PLAYERS}
 
     # ---------------------------------------------------------------- invite
@@ -97,6 +101,11 @@ class HostServer:
         self.ai_count = max(0, min(n, MAX_PLAYERS - 1 - len(self.guests)))
         self.broadcast_lobby()
 
+    def set_game(self, game: str):
+        if game in GAMES and not self.in_game:
+            self.game = game
+            self.broadcast_lobby()
+
     def set_ai_level(self, level: str):
         self.ai_level = level
         self.broadcast_lobby()
@@ -120,7 +129,7 @@ class HostServer:
     def broadcast_lobby(self):
         members = self.members()
         for i, g in enumerate(self.guests):
-            g.send({"t": "lobby", "players": members, "you": i + 1})
+            g.send({"t": "lobby", "players": members, "you": i + 1, "game": self.game})
 
     def kick(self, conn: Connection, reason: str = "The host removed you from the lobby."):
         conn.send({"t": "kicked", "reason": reason})
@@ -185,10 +194,17 @@ class HostServer:
 
     # ---------------------------------------------------------------- game
 
-    def start_game(self, ai_speed_delay: float) -> "HostSession":
+    def start_game(self, ai_speed_delay: float = 0.0):
         if 1 + len(self.guests) + self.ai_count < 2:
             raise NetError("You need at least one other player or computer.")
         self.in_game = True
+        if self.game == "GO FISH":
+            names = self._ai_names()
+            self.session = start_fish(self, names, [self._ai_level(k) for k in range(len(names))])
+            for g in self.guests:
+                g.send({"t": "start", "game": self.game})
+            self.session.flush(force=True)
+            return self.session
         players = [Player(self.name, is_human=True)]
         players += [Player(g.tag, is_human=True) for g in self.guests]
         ais = {}
@@ -199,7 +215,7 @@ class HostServer:
         game = Game(players, random.Random())
         self.session = HostSession(self, game, ais)
         for g in self.guests:
-            g.send({"t": "start"})
+            g.send({"t": "start", "game": self.game})
         self.session.flush(force=True)
         return self.session
 

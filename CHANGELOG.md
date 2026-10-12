@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.4.0
+
+- Go Fish multiplayer! Pick 10 PHASES or GO FISH in the lobby, then invite friends the same way
+- Nearby games and the lobby show which game you're joining
+- Everyone needs this version to play together online
+
 ## 1.3.0
 
 - New game: Go Fish! Use the arrows on the main menu to switch between 10 Phases and Go Fish

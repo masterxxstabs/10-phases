@@ -13,7 +13,7 @@ import secrets
 import socket
 import threading
 
-VERSION = 1
+VERSION = 2   # 2: Go Fish multiplayer
 GAME_PORT = 47610
 DISCOVERY_PORT = 47611
 MAX_LINE = 256 * 1024

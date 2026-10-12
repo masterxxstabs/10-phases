@@ -63,7 +63,7 @@ Requires Python 3.10+.
 
 Play with up to 5 friends, and fill any empty seats with computer players. There's no server to run, because one player's game hosts the table.
 
-**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**.
+**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES** or **GO FISH** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
 - You get an invite code like `DAAAA-SCZH7-RE8PR`. **COPY CODE** puts it on your clipboard so you can send it to friends.
 - Choose how many computer players to add and their level, then press **START GAME** once your friends are in.
 - **KICK** removes a player from the lobby.
@@ -80,7 +80,7 @@ The first time you host, your firewall (for example Windows Defender Firewall) m
 
 **How it works**
 - The host's game is the only real copy of the game. Guests send their moves, and the host checks every one against the rules.
-- Each player only receives their own hand. Opponents' hands are sent as card counts.
+- Each player only receives their own hand. Opponents' hands are sent as card counts. In Go Fish, a card someone fishes stays hidden unless it was the number they asked for.
 - If a guest disconnects mid-game, a Medium computer player takes over their seat.
 - If the host leaves, guests are told and sent back to the menu.
 - When a game ends, the host can take everyone **BACK TO LOBBY** to play again.
@@ -116,7 +116,7 @@ Go Fish uses the same table, cards and look:
 - **Helpers:** speech bubbles show every question and answer, the **BOOKS** board shows all 12 books and who made each, and **HINT** suggests who to ask for what.
 - **Hover:** hovering a player shows their books and, with Hints on, what they've asked for.
 
-Settings (opponents, AI level, speed, sounds, hints) and Customize apply to both games. Multiplayer is 10 Phases only for now.
+Settings (opponents, AI level, speed, sounds, hints) and Customize apply to both games. Both games work in multiplayer: the host picks the game in the lobby.
 
 ## Knowing your phase
 

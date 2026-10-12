@@ -86,7 +86,7 @@ class MultiplayerScene(Scene):
 
     def _host(self):
         try:
-            server = HostServer(self._player_name())
+            server = HostServer(self._player_name(), game=self.app.settings.game)
         except NetError as e:
             sfx.play("error")
             self.flash.show(str(e))
@@ -176,7 +176,7 @@ class MultiplayerScene(Scene):
             row = pygame.Rect(664, 214 + k * 76, 544, 66)
             theme.rounded(surf, theme.INNER, row, 10)
             theme.face(surf, (row.x + 30, row.centery), 20, k + 1)
-            theme.ptext(surf, f"{g.get('name', 'HOST')}'S GAME", (row.x + 62, row.y + 12), 18)
+            theme.ptext(surf, f"{g.get('name', 'HOST')}'S {g.get('game', '10 PHASES')}", (row.x + 62, row.y + 12), 18)
             app_v = f"  -  V{g['app']}" if isinstance(g.get("app"), str) else ""
             theme.ptext(surf, f"{g.get('players', 1)}/{g.get('max', MAX_PLAYERS)} PLAYERS{app_v}",
                         (row.x + 62, row.y + 38), 13, theme.TEXT_DIM)
@@ -198,6 +198,7 @@ class HostLobbyScene(Scene):
                                   self._set_ai, size=18)
         self.ai_level = Segmented((660, 646, 560, 50), list(DIFFICULTY_CHOICES), server.ai_level,
                                   lambda v: server.set_ai_level(v), size=16)
+        self.game_pick = Segmented((84, 640, 486, 50), ["10 PHASES", "GO FISH"], server.game, self._set_game, size=16)
         self.public_ip = TextInput((84, 512, 330, 50), "", max_len=15, placeholder="PUBLIC IP",
                                    allowed=lambda ch: ch.isdigit() or ch == ".", size=18, on_enter=self._set_ip)
         self.buttons = [
@@ -239,6 +240,11 @@ class HostLobbyScene(Scene):
         self.server.close()
         self.app.go(MultiplayerScene(self.app))
 
+    def _set_game(self, game: str):
+        self.server.set_game(game)
+        self.app.settings.game = game
+        self.app.settings.save()
+
     def _start(self):
         try:
             session = self.server.start_game(SPEED_DELAYS[self.app.settings.ai_speed])
@@ -246,8 +252,12 @@ class HostLobbyScene(Scene):
             sfx.play("error")
             self.flash.show(str(e))
             return
-        from .game_scene import GameScene
-        self.app.go(GameScene(self.app, host=self.server, session=session))
+        if self.server.game == "GO FISH":
+            from .gofish_scene import GoFishScene
+            self.app.go(GoFishScene(self.app, host=self.server, session=session))
+        else:
+            from .game_scene import GameScene
+            self.app.go(GameScene(self.app, host=self.server, session=session))
 
     def handle(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and not self.public_ip.focused:
@@ -258,7 +268,7 @@ class HostLobbyScene(Scene):
                 return
         if self.public_ip.handle(event):
             return
-        for c in (self.ai_count, self.ai_level):
+        for c in (self.ai_count, self.ai_level, self.game_pick):
             if c.handle(event):
                 return
 
@@ -304,7 +314,9 @@ class HostLobbyScene(Scene):
             theme.ptext(surf, line, (84, y), 12, theme.TEXT_DIM)
             y += 15
         self.public_ip.draw(surf)
-        theme.ptext(surf, "Invite codes change every time you host.", (84, 584), 12, theme.TEXT_FAINT)
+        theme.ptext(surf, "Invite codes change every time you host.", (84, 576), 12, theme.TEXT_FAINT)
+        theme.ptext(surf, "GAME", (84, 612), 16, theme.ACCENT)
+        self.game_pick.draw(surf)
 
         right = pygame.Rect(640, 110, 600, 586)
         theme.panel(surf, right)
@@ -365,8 +377,12 @@ class GuestLobbyScene(Scene):
         if len(c.members) > before and before:
             sfx.play("coin")
         if c.game is not None and c.game.players:
-            from .game_scene import GameScene
-            self.app.go(GameScene(self.app, client=c))
+            if c.game_name == "GO FISH":
+                from .gofish_scene import GoFishScene
+                self.app.go(GoFishScene(self.app, client=c))
+            else:
+                from .game_scene import GameScene
+                self.app.go(GameScene(self.app, client=c))
 
     def draw(self, surf):
         backdrop(surf, self.clock)
@@ -380,7 +396,7 @@ class GuestLobbyScene(Scene):
         elif c.status == "waiting":
             title, sub = f"SAYING HELLO{dots}", "Connected. Joining the lobby"
         else:
-            title, sub = f"{c.host_name}'S GAME", f"Waiting for {c.host_name} to start{dots}"
+            title, sub = f"{c.host_name}'S {c.game_name}", f"Waiting for {c.host_name} to start{dots}"
         theme.ptext(surf, title, (box.centerx, box.y + 36), 26, theme.ACCENT, anchor="center")
         theme.ptext(surf, sub, (box.centerx, box.y + 70), 15, theme.TEXT_DIM, anchor="center")
         for k, m in enumerate(c.members[:MAX_PLAYERS]):

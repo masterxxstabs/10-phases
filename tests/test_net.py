@@ -149,3 +149,57 @@ def test_garbled_state_from_host_disconnects_cleanly():
         assert "understand" in guest.error
     finally:
         server.close()
+
+
+def test_full_go_fish_game_over_localhost():
+    from ten_phases.gofish.ai import GoFishAI
+
+    server = HostServer("HOSTY", port=0, announce=False, game="GO FISH")
+    try:
+        guests = [ClientSession(n, "127.0.0.1", server.port, server.key) for n in ("ANA", "BO")]
+
+        def pump_all():
+            server.pump()
+            for c in guests:
+                c.poll()
+        assert wait_for(lambda: all(c.status == "joined" and len(c.members) == 3 for c in guests), pump_all)
+        assert all(c.game_name == "GO FISH" for c in guests)
+        guests.sort(key=lambda c: c.my_index)
+        server.set_ai_count(1)
+        session = server.start_game()
+        game = session.game
+        assert wait_for(lambda: all(c.game is not None and c.game.players for c in guests), pump_all)
+        assert all(type(c.game).__name__ == "RemoteFishGame" for c in guests)
+        host_ai = GoFishAI("Hard", random.Random(1))
+        guest_ai = [GoFishAI("Hard", random.Random(2 + k)) for k in range(2)]
+
+        hidden_ok = True
+        steps = 0
+        while not game.game_over and steps < 40000:
+            steps += 1
+            pump_all()
+            for c in guests:  # nobody may see another player's cards
+                if any(x.id != -1 for p in c.game.players[1:] for x in p.hand):
+                    hidden_ok = False
+            if game.game_over:
+                break
+            seat = game.current
+            if seat == 0 or seat in session.ais:
+                ai = session.ais.get(seat, host_ai)
+                game.ask(seat, *ai.choose_ask(game, seat))
+                continue
+            c = guests[seat - 1]
+            rg = c.game
+            if rg.pending or rg.current != 0 or rg.game_over:
+                time.sleep(0.001)
+                continue
+            target, value = guest_ai[seat - 1].choose_ask(rg, 0)
+            rg.ask(0, target, value)
+        assert game.game_over and game.books_made() == 12 and hidden_ok
+        assert wait_for(lambda: all(c.game.game_over for c in guests), pump_all)
+        for c in guests:
+            seat = 1 + guests.index(c)
+            assert c.game.players[0].books == game.players[seat].books
+            assert c.game.books_made() == 12
+    finally:
+        server.close()
