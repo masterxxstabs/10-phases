@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.13.0
+
+- Poker: queue your move while others play (CHECK / FOLD, CHECK or CALL ANY), and it happens the moment your turn comes
+- Poker: the cards that make your hand glow (and the winner's at a showdown), and the status bar shows your pot odds
+- Poker: type a number to set your bet, fast-forward a hand you've folded, and see the last hand's winner and your record
+- A black DEV tag next to the developer's name
+
 ## 1.12.0
 
 - New profile: pick a profile picture, a background for your hover card, and the colour of your name (click your card on the main menu)

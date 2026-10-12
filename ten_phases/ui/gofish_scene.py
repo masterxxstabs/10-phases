@@ -509,7 +509,8 @@ class GoFishScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 16)
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color)
         cnt = theme.ptext(surf, str(len(p.hand)), (r.right - 12, r.y + 8), 18, anchor="topright")
@@ -594,7 +595,8 @@ class GoFishScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         prof = profile_art.seat_profile(self, HUMAN)
         profile_art.avatar(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, prof, HUMAN, level=True)
-        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 18)
         x = MY_BOX.x + 140
         theme.mini_card_icon(surf, (x, MY_BOX.y + 15))
         theme.ptext(surf, str(len(self.me.hand)), (x + 20, MY_BOX.y + 12), 18)
@@ -662,7 +664,8 @@ class GoFishScene(Scene):
         profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 20)
         self._chip(surf, self.role(i)[0], (rect.x + 72, rect.y + 44), self.role(i)[1], size=12)
         theme.ptext(surf, f"{len(p.books)} BOOKS", (rect.right - 18, rect.y + 12), 26, theme.ACCENT, anchor="topright")
         theme.ptext(surf, f"{len(p.hand)} CARD{'S' if len(p.hand) != 1 else ''} IN HAND", (rect.right - 18, rect.y + 46), 14, theme.TEXT_DIM,
@@ -727,7 +730,9 @@ class GoFishScene(Scene):
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
                 prof = profile_art.seat_profile(self, i)
                 profile_art.avatar(surf, (row.x + 34, row.centery), 20, prof, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                name_r = theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20,
+                                     profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                profile_art.name_tag(surf, name_r, prof, 16)
                 theme.ptext(surf, f"{len(p.books)}", (row.x + 230, row.centery), 26, theme.ACCENT, anchor="center")
                 for n, v in enumerate(p.books):
                     self._book_badge(surf, (row.x + 290 + n * 36, row.centery + 2), v, 22, i)

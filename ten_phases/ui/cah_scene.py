@@ -768,7 +768,9 @@ class CahScene(Scene):
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
                 prof = profile_art.seat_profile(self, i)
                 profile_art.avatar(surf, (row.x + 34, row.centery), 18, prof, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                name_r = theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20,
+                                     profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                profile_art.name_tag(surf, name_r, prof, 16)
                 label = p.difficulty.upper() if p.difficulty else "PLAYER"
                 color = DIFF_COLORS.get(p.difficulty, theme.CARD_WHITE)
                 theme.ptext(surf, label, (row.x + 320, row.centery), 14, color, anchor="midleft")

@@ -49,6 +49,28 @@ def swatch_rgb(name: str, clock: float = 0.0) -> tuple[int, int, int]:
     return name_rgb({"c": name}, clock)
 
 
+# --------------------------------------------------------------------------- DEV tag
+
+
+def dev_tag(surf, midleft, size: int = 14) -> pygame.Rect:
+    """A black DEV tag (for the game's developer)."""
+    img = theme.pixel_surface("DEV", max(8, size - 2), (255, 255, 255), None)
+    r = pygame.Rect(0, 0, img.get_width() + 14, img.get_height() + 6)
+    r.midleft = (int(midleft[0]), int(midleft[1]))
+    pygame.draw.rect(surf, theme.OUTLINE, r.move(0, 2), border_radius=6)
+    pygame.draw.rect(surf, (12, 12, 16), r, border_radius=6)
+    pygame.draw.rect(surf, (235, 235, 240), r, 2, border_radius=6)
+    surf.blit(img, img.get_rect(center=(r.centerx, r.centery + 1)))
+    return r
+
+
+def name_tag(surf, name_rect: pygame.Rect, prof: dict | None, size: int = 14) -> pygame.Rect:
+    """Draw the DEV tag after a name if this player has one. Returns the name (and tag) area."""
+    if prof and prof.get("d"):
+        return name_rect.union(dev_tag(surf, (name_rect.right + 8, name_rect.centery), size))
+    return name_rect
+
+
 # --------------------------------------------------------------------------- level badge
 
 

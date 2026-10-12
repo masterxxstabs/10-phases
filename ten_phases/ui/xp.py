@@ -26,6 +26,7 @@ class XpTracker:
         self.rounds_done: set = set()
         self.game_done = False
         self._unsaved = 0.0
+        self.corner = (12, theme.HEIGHT - 62)   # top-left of the XP bar (tables can move it out of the way)
 
     @property
     def settings(self):
@@ -112,13 +113,13 @@ class XpTracker:
     def draw(self, surf) -> None:
         if self.bar > 0 or self.toast:
             self._draw_bar(surf)
-        y = theme.HEIGHT - 84
+        y = self.corner[1] - 22
         for amount, left in reversed(self.pops):
             rise = int((1.3 - left) * 26)
             img = theme.pixel_surface(f"+{amount} XP", 16, (150, 240, 255))
             if left < 0.35:
                 img.set_alpha(int(255 * left / 0.35))
-            surf.blit(img, (18, y - rise))
+            surf.blit(img, (self.corner[0] + 6, y - rise))
             y -= 22
         if self.toast:
             self._draw_toast(surf)
@@ -126,7 +127,7 @@ class XpTracker:
     def _draw_bar(self, surf):
         level, into, need = progress(self.settings.xp)
         alpha = min(1.0, self.bar / 0.4) if not self.toast else 1.0
-        box = pygame.Rect(12, theme.HEIGHT - 62, 236, 28)
+        box = pygame.Rect(*self.corner, 236, 28)
         layer = pygame.Surface(box.size, pygame.SRCALPHA)
         pygame.draw.rect(layer, (*theme.OUTLINE, 210), layer.get_rect(), border_radius=14)
         bar = pygame.Rect(52, 9, box.w - 62, 10)

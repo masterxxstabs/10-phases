@@ -292,8 +292,9 @@ class MenuScene(Scene):
                           edge_w=3 if hover else 2)
         profile_art.avatar(surf, (card.x + 40, card.y + 42), 28, prof, 0)
         profile_art.level_badge(surf, (card.x + 40, card.y + 76), prof["l"], 13)
-        theme.ptext(surf, s.player_name or "PLAYER", (card.x + 80, card.y + 14), 20,
-                    profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, s.player_name or "PLAYER", (card.x + 80, card.y + 14), 20,
+                             profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 12)
         level, into, need = progress(s.xp)
         theme.ptext(surf, f"LEVEL {level}", (card.x + 80, card.y + 42), 13, theme.TEXT_DIM)
         bar = pygame.Rect(card.x + 80, card.y + 62, card.w - 96, 10)

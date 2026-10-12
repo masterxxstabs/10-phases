@@ -174,10 +174,21 @@ def equipped(settings, item: Cosmetic) -> bool:
 # --------------------------------------------------------------------------- profiles on the table
 
 
+# Players with these names get a black DEV tag next to their name (any capitalisation).
+DEV_NAMES = {"SHAWN"}
+
+
+def is_dev(name) -> bool:
+    return isinstance(name, str) and name.strip().upper() in DEV_NAMES
+
+
 def my_profile(settings) -> dict:
     """What we send to other players (and draw for ourselves)."""
-    return clean_profile({"a": settings.avatar, "b": settings.banner, "c": settings.name_color,
+    prof = clean_profile({"a": settings.avatar, "b": settings.banner, "c": settings.name_color,
                           "l": level_of(settings)})
+    if is_dev(settings.player_name):
+        prof["d"] = True
+    return prof
 
 
 def clean_profile(value) -> dict:
@@ -204,6 +215,8 @@ def ai_profile(seed) -> dict:
 def player_profile(player) -> dict:
     """The profile a player shows: their own if we know it, otherwise a computer's pick."""
     prof = getattr(player, "profile", None)
-    if prof:
-        return clean_profile(prof)
-    return ai_profile(player.name)
+    prof = clean_profile(prof) if prof else ai_profile(player.name)
+    # The DEV tag comes from the name itself, never from what the network says.
+    if getattr(player, "is_human", False) and is_dev(player.name):
+        prof["d"] = True
+    return prof

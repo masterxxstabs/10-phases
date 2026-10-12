@@ -137,3 +137,116 @@ def test_computer_players_finish_games_and_hints_make_sense():
         g.act(i, *ais[i].choose(g, i))
     assert equity(cards("Ar Ab"), [], 1, 300, rng) > 0.75
     assert equity(cards("7r 2b"), [], 1, 300, rng) < 0.45
+
+
+@pytest.mark.parametrize("hand, key", [
+    ("8r 8b 3g Kr 2b 5g Jy", "8 8"),
+    ("Ar Ab Kr Kb Qg Qy 2r", "14 14 13 13"),
+    ("Kr Kb Kg 2y 2r 3b 4g", "13 13 13 2 2"),
+    ("Ar 2b 3g 4y 5r Kb Kg", "14 2 3 4 5"),
+    ("Ar Qb 9r 7b 5g 3y 2r", "14"),
+])
+def test_key_cards_are_the_ones_that_make_the_hand(hand, key):
+    from ten_phases.poker.engine import best_five, key_cards
+    got = sorted(c.value for c in key_cards(cards(hand)))
+    assert got == sorted(int(v) for v in key.split())
+    assert len(best_five(cards(hand))) == 5
+
+
+def _table(app, opponents=3):
+    from ten_phases.ui.poker_scene import PokerScene
+    app.settings.opponents, app.settings.ai_speed = opponents, "Fast"
+    scene = PokerScene(app)
+    app.go(scene)
+    scene.splash = None
+    return scene
+
+
+def _until(scene, cond, steps=4000):
+    for _ in range(steps):
+        if cond():
+            return True
+        scene.update(0.05)
+        scene.draw(scene.app.screen)
+    return cond()
+
+
+def test_queued_moves_play_themselves_on_your_turn(app):
+    scene = _table(app)
+    g = scene.game
+    def waiting_to_queue():
+        if scene.my_turn():
+            scene.check_or_call()
+        return scene.can_queue() and not scene.anims
+    assert _until(scene, waiting_to_queue)
+    scene.draw(app.screen)
+    assert all(b.visible for b in scene.pre_buttons) and not scene.btn_fold.visible
+    scene.toggle_pre("call_any")
+    assert scene.pre == "call_any"
+    scene.toggle_pre("call_any")
+    assert scene.pre is None                        # click again to cancel
+    scene.toggle_pre("call_any")
+    hands = g.round
+    assert _until(scene, lambda: scene.pre is None)
+    assert g.players[0].folded is False and (g.round > hands or g.players[0].acted or g.phase != "playing"
+                                             or g.current != 0)
+    # A queued CHECK is cancelled (not turned into a call or fold) when someone bets.
+    scene.pre = "check"
+    g.current_bet, g.players[0].bet = g.current_bet + 5, 0
+    if scene.my_turn():
+        scene._run_pre()
+        assert scene.pre is None and scene.flash and not g.players[0].folded
+
+
+def test_check_fold_folds_to_a_bet(app):
+    scene = _table(app)
+    g = scene.game
+    assert _until(scene, lambda: scene.my_turn())
+    if g.to_call(0):
+        scene.pre = "check_fold"
+        scene._run_pre()
+        assert g.players[0].folded
+    else:
+        scene.pre = "check_fold"
+        scene._run_pre()
+        assert not g.players[0].folded
+
+
+def test_typing_a_bet_and_pot_odds(app):
+    scene = _table(app)
+    g = scene.game
+    assert _until(scene, lambda: scene.my_turn() and scene.raise_bounds())
+    lo, hi = scene.raise_bounds()
+    scene.type_digit("9")
+    scene.type_digit("9")
+    assert scene.raise_to == min(hi, 99) and scene.typed == "99"
+    scene.handle(__import__("pygame").event.Event(__import__("pygame").KEYDOWN, key=__import__("pygame").K_BACKSPACE,
+                                                  mod=0, unicode=""))
+    assert scene.typed == "9" and scene.raise_to == max(lo, min(hi, 9))
+    if g.to_call(0):
+        odds = scene.pot_odds()
+        assert 0 < odds < 100 and f"{odds}%" in scene._status()
+    else:
+        assert scene.pot_odds() is None
+
+
+def test_fast_forward_after_folding(app):
+    scene = _table(app, opponents=4)
+    g = scene.game
+    for _ in range(20):
+        assert _until(scene, lambda: scene.my_turn() or g.game_over)
+        if g.game_over:
+            pytest.skip("the game ended before a fold could be tested")
+        if g.to_call(0):
+            scene.act("fold")
+            break
+        scene.check_or_call()
+    else:
+        pytest.skip("never faced a bet")
+    if g.phase == "playing":
+        scene.draw(app.screen)
+        assert scene.btn_fast.visible and not scene.btn_fold.visible
+        scene.fast_forward()
+        assert scene.fast
+        assert _until(scene, lambda: g.phase != "playing", 2000)
+    assert _until(scene, lambda: not scene.fast or g.game_over, 2000)   # the next hand plays at normal speed

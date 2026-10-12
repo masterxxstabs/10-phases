@@ -147,8 +147,9 @@ class ProfileScene(Scene):
         pop = 1 + 0.15 * max(0.0, 1 - age / 0.3)
         profile_art.avatar(surf, (CARD.centerx, CARD.y + 110), int(72 * pop), prof, 0)
         name = s.player_name or "PLAYER"
-        theme.ptext(surf, name, (CARD.centerx, CARD.y + 212), 34, profile_art.name_rgb(prof, self.clock),
-                    anchor="center")
+        name_r = theme.ptext(surf, name, (CARD.centerx, CARD.y + 212), 34, profile_art.name_rgb(prof, self.clock),
+                             anchor="center")
+        profile_art.name_tag(surf, name_r, prof, 18)
         level, into, need = progress(s.xp)
         profile_art.level_badge(surf, (CARD.centerx, CARD.y + 258), level, 22)
         bar = pygame.Rect(CARD.x + 40, CARD.y + 298, CARD.w - 80, 18)

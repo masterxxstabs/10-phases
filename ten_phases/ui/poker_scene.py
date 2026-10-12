@@ -16,7 +16,7 @@ import pygame
 from ..names import pick_ai_names
 from ..poker import ai as poker_ai
 from ..poker.ai import PokerAI
-from ..poker.engine import HANDS_PER_LEVEL, PokerGame, PokerPlayer, RuleError, describe, evaluate
+from ..poker.engine import HANDS_PER_LEVEL, PokerGame, PokerPlayer, RuleError, describe, evaluate, key_cards
 from ..settings import SPEED_DELAYS
 from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
@@ -90,6 +90,7 @@ class PokerScene(Scene):
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
         self.xp = XpTracker(self, "poker")
+        self.xp.corner = (MY_BOX.right - 256, MY_BOX.bottom - 46)   # bottom-right, clear of the buttons
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.anims: list[FlyingCard] = []
         self.chips: list[ChipFly] = []
@@ -108,6 +109,11 @@ class PokerScene(Scene):
         self._picked_for: tuple | None = None
         self.dragging = False
         self.hint_rng = random.Random()
+        self.pre: str | None = None     # a move queued for your turn: check_fold, check or call_any
+        self.typed = ""                 # digits typed to set the bet
+        self.typed_timer = 0.0
+        self.fast = False               # fast-forward the rest of a hand you've folded
+        self.last_hand = ""
 
         self.btn_fold = Button((600, 518, 150, 56), "FOLD", lambda: self.act("fold"), size=20)
         self.btn_call = Button((760, 518, 200, 56), "CHECK", self.check_or_call, size=20)
@@ -117,11 +123,16 @@ class PokerScene(Scene):
         self.quick = [Button((600 + k * 158, 652, 148, 44), label, lambda f=f: self.pick(f), size=15)
                       for k, (label, f) in enumerate((("MIN", "min"), ("1/2 POT", 0.5), ("POT", 1.0),
                                                       ("ALL IN", "all")))]
+        self.pre_buttons = [Button((600 + k * 210, 518, 200, 56), label, lambda w=what: self.toggle_pre(w), size=16)
+                            for k, (label, what) in enumerate((("CHECK / FOLD", "check_fold"), ("CHECK", "check"),
+                                                               ("CALL ANY", "call_any")))]
+        self.btn_fast = Button((600, 518, 620, 56), "FAST FORWARD TO THE NEXT HAND", self.fast_forward, size=18)
         self.btn_hint = Button((40, 706, 120, 44), "HINT", self.do_hint, size=15)
         self.btn_menu = Button((170, 706, 120, 44), "MENU", lambda: self._set_overlay("pause"), size=15)
         self.action_buttons = [self.btn_fold, self.btn_call, self.btn_raise]
         self.picker_buttons = [self.btn_minus, self.btn_plus] + self.quick
-        self.buttons = self.action_buttons + self.picker_buttons + [self.btn_hint, self.btn_menu]
+        self.buttons = self.action_buttons + self.picker_buttons + [self.btn_hint, self.btn_menu] + \
+            self.pre_buttons + [self.btn_fast]
         self.overlay_buttons: list[Button] = []
         self._consume_events()
         sfx.play("shuffle")
@@ -262,6 +273,8 @@ class PokerScene(Scene):
             if k == "round_start":
                 self.bubbles = []
                 self.hint_action = None
+                self.pre = None
+                self.fast = False
                 sfx.play("shuffle")
             elif k == "blind":
                 self.bubble(i, f"{ev.name.upper()} BLIND {ev.amount}", theme.TEXT_DIM, 1.2)
@@ -320,6 +333,10 @@ class PokerScene(Scene):
                 else:
                     sfx.play("coin")
             elif k == "settled":
+                if g.last_wins:
+                    w = max(g.last_wins, key=lambda x: x["amount"])
+                    self.last_hand = f"Last hand: {self.name(w['player']).title()} won {w['amount']}" + \
+                        (f" ({w['hand'].lower()})" if w["hand"] else "")
                 showdown = len(g.revealed) > 1
                 self.settle_timer = 3.6 if showdown else 2.2
                 if g.players[HUMAN].in_hand and not any(w["player"] == HUMAN for w in g.last_wins) and \
@@ -353,8 +370,63 @@ class PokerScene(Scene):
             self.error(str(e))
             return
         self.hint_action = None
+        self.typed = ""
         self._consume_events()
         self.ai_timer = self.delay + 0.3
+
+    # ================================================================== quality of life
+
+    def can_queue(self) -> bool:
+        """Can you queue a move? (You're in the hand, it's not your turn yet, and betting is on.)"""
+        g = self.game
+        p = self.me
+        return g.phase == "playing" and p.live and not p.all_in and g.current != HUMAN and \
+            not getattr(self.game, "pending", False)
+
+    def toggle_pre(self, what: str):
+        if not self.can_queue():
+            return
+        self.pre = None if self.pre == what else what
+        sfx.play("select" if self.pre else "deselect")
+
+    def _run_pre(self):
+        """Your turn came up with a move queued: make it (a queued CHECK waits if someone bet)."""
+        what, self.pre = self.pre, None
+        to_call = self.game.to_call(HUMAN)
+        if what == "check_fold":
+            self.act("check" if not to_call else "fold")
+        elif what == "check" and not to_call:
+            self.act("check")
+        elif what == "call_any":
+            self.act("call" if to_call else "check")
+        elif what == "check":
+            self.flash = ("Someone bet, so your CHECK was cancelled. Your move!", 2.6)
+            sfx.play("turn")
+
+    def can_fast_forward(self) -> bool:
+        g = self.game
+        return not self.networked and g.phase == "playing" and not self.me.live and not self.fast
+
+    def fast_forward(self):
+        if self.can_fast_forward():
+            self.fast = True
+            self.ai_timer = min(self.ai_timer, 0.1)
+            sfx.play("select")
+
+    def type_digit(self, d: str):
+        if not self.raise_bounds() or not self.my_turn():
+            return
+        self.typed = (self.typed + d)[-5:]
+        self.typed_timer = 2.0
+        self.set_raise(int(self.typed))
+
+    def pot_odds(self) -> int | None:
+        """Percent of the time a call has to win to pay off (None when there's nothing to call)."""
+        g = self.game
+        to_call = g.to_call(HUMAN) if g.phase == "playing" else 0
+        if not to_call:
+            return None
+        return round(100 * to_call / (g.pot_total() + to_call))
 
     def do_hint(self):
         if not self.my_turn():
@@ -377,7 +449,7 @@ class PokerScene(Scene):
         except RuleError:
             g.act(i, "check" if g.to_call(i) == 0 else "fold")   # never let a computer stall the table
         self._consume_events()
-        self.ai_timer = self.delay * 1.3 + 0.3
+        self.ai_timer = (self.delay * 1.3 + 0.3) * (0.12 if self.fast else 1.0)
 
     # ================================================================== network
 
@@ -492,6 +564,12 @@ class PokerScene(Scene):
                 self.nudge(-1 if event.mod & pygame.KMOD_SHIFT else -big)
             elif event.key in (pygame.K_RIGHT, pygame.K_UP):
                 self.nudge(1 if event.mod & pygame.KMOD_SHIFT else big)
+            elif event.unicode and event.unicode.isdigit():
+                self.type_digit(event.unicode)
+            elif event.key == pygame.K_BACKSPACE and self.typed:
+                self.typed = self.typed[:-1]
+                if self.typed:
+                    self.set_raise(int(self.typed))
             return
         if self.raise_bounds() and self.my_turn():
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and SLIDER.collidepoint(event.pos):
@@ -519,11 +597,18 @@ class PokerScene(Scene):
         self._pump_network()
         if self.game.events:
             self._consume_events()
+        speed = 4.0 if self.fast else 1.0
         for a in self.anims:
-            a.t += dt
+            a.t += dt * speed
         self.anims = [a for a in self.anims if not a.done]
         for c in self.chips:
-            c.t += dt
+            c.t += dt * speed
+        if self.typed_timer:
+            self.typed_timer = max(0.0, self.typed_timer - dt)
+            if not self.typed_timer:
+                self.typed = ""
+        if self.pre and not self.can_queue() and not self.my_turn():
+            self.pre = None
         self.chips = [c for c in self.chips if not c.done]
         for b in self.bubbles:
             b.ttl -= dt
@@ -534,6 +619,8 @@ class PokerScene(Scene):
             t, s, left, total = self.splash
             self.splash = (t, s, left - dt, total) if left > dt else None
         self._sync_picker()
+        if self.pre and self.my_turn():
+            self._run_pre()
         if self._pending_overlay and not self.anims and not self.splash:
             self._set_overlay("game")
             return
@@ -542,7 +629,7 @@ class PokerScene(Scene):
             return
         if g.phase == "settled" and self.client is None:
             # Show the cards for a moment, then deal the next hand (the host does this for everyone).
-            self.settle_timer -= dt
+            self.settle_timer -= dt * (3 if self.fast else 1)
             if self.settle_timer <= 0:
                 if not self.networked and self.me.chips == 0:
                     g.end_now()   # you're out: no need to watch the computers play on
@@ -566,6 +653,7 @@ class PokerScene(Scene):
         for i in self.others():
             self._draw_seat(surf, i)
         self._draw_me(surf, hidden)
+        self._draw_key_cards(surf, hidden)
         for a in self.anims:
             a.draw(surf)
         for c in self.chips:
@@ -597,8 +685,14 @@ class PokerScene(Scene):
             return "You folded. Wait for the next hand."
         if self.my_turn():
             to_call = g.to_call(HUMAN)
-            ask = f"CALL {to_call}" if to_call else "CHECK"
-            return f"Your turn: FOLD (F), {ask} (C), or pick a bet and RAISE (R). Arrows change the bet."
+            if to_call:
+                odds = self.pot_odds()
+                return f"Your turn: CALL {to_call} (C) into a pot of {g.pot_total()} - worth it if you win " \
+                       f"{odds}% of the time. FOLD (F) or RAISE (R). Type a number to bet."
+            return "Your turn: CHECK (C), or pick a bet and RAISE (R). Type a number or use the arrows."
+        if self.pre and self.me.live:
+            return {"check_fold": "Queued: CHECK, or FOLD if someone bets.", "check": "Queued: CHECK.",
+                    "call_any": "Queued: CALL whatever the bet is."}[self.pre]
         if g.current is not None and g.current != HUMAN:
             return f"{self.name(g.current)} is thinking..."
         return "Wait until it is your turn."
@@ -632,10 +726,20 @@ class PokerScene(Scene):
         small, big = g.blinds
         theme.ptext(surf, f"BLINDS {small}/{big}", (INFO_BOX.x + 16, INFO_BOX.y + 76), 18, theme.INFO)
         left = HANDS_PER_LEVEL - (max(1, g.round) - 1) % HANDS_PER_LEVEL
-        lines = (f"Blinds double in {left} hand{'s' if left != 1 else ''}", "No limit: bet any amount",
-                 "Most chips at the end wins")
-        for k, line in enumerate(lines):
-            theme.text(surf, line, (INFO_BOX.x + 18, INFO_BOX.y + 108 + k * 24), 14, theme.TEXT_DIM, bold=False)
+        lines = [(f"Blinds double in {left} hand{'s' if left != 1 else ''}", theme.TEXT_DIM)]
+        if self.last_hand:
+            lines.append((self.last_hand, theme.TEXT))
+        res = self.me.results
+        if res:
+            won = sum(r in ("won", "split") for r in res)
+            lines.append((f"You've won {won} of {len(res)} hand{'s' if len(res) != 1 else ''}", theme.TEXT_DIM))
+        else:
+            lines.append(("Most chips at the end wins", theme.TEXT_DIM))
+        f = theme.font(14, False)
+        for k, (line, color) in enumerate(lines[:3]):
+            while f.size(line)[0] > INFO_BOX.w - 32 and len(line) > 4:
+                line = line[:-4].rstrip() + "..."
+            theme.text(surf, line, (INFO_BOX.x + 18, INFO_BOX.y + 108 + k * 24), 14, color, bold=False)
 
     def _draw_board(self, surf, hidden):
         g = self.game
@@ -697,7 +801,8 @@ class PokerScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 14)
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 32), color)
         cr = theme.ptext(surf, str(p.chips), (r.right - 12, r.y + 8), 20, theme.ACCENT, anchor="topright")
@@ -722,6 +827,27 @@ class PokerScene(Scene):
             theme.ptext(surf, name, (tx, r.y + 104), 13, theme.INFO)
         self._bet_stack(surf, self.bet_spot(i), p.bet)
 
+    def _draw_key_cards(self, surf, hidden):
+        """Glow around the cards that make your hand, and the winning hand at a showdown."""
+        g = self.game
+        if len(g.board) < 3 or self.anims:
+            return
+        glows = []
+        if g.phase == "settled" and len(g.revealed) > 1 and g.last_wins:
+            w = max(g.last_wins, key=lambda x: x["amount"])["player"]
+            p = g.players[w]
+            if p.hole and all(c.value is not None for c in p.hole):
+                glows.append((w, key_cards(p.hole + g.board), theme.SUCCESS))
+        elif self.me.live and self.me.hole and self.me.hole[0].value is not None:
+            glows.append((HUMAN, key_cards(self.me.hole + g.board), theme.ACCENT))
+        pulse = 2 + int(1.5 * (1 + math.sin(self.clock * 5)))
+        for who, cards, color in glows:
+            ids = {c.id for c in cards}
+            rects = [self.board_rect(k) for k, c in enumerate(g.board) if c.id in ids and c.id not in hidden]
+            rects += [self.hole_rect(who, k) for k, c in enumerate(g.players[who].hole) if c.id in ids]
+            for r in rects:
+                pygame.draw.rect(surf, color, r.inflate(8, 8), pulse, border_radius=12)
+
     def _draw_me(self, surf, hidden):
         g = self.game
         p = self.me
@@ -740,7 +866,9 @@ class PokerScene(Scene):
         theme.ptext(surf, "YOUR STACK", (x, MY_BOX.y + 104), 12, theme.TEXT_DIM)
         theme.chip(surf, (x + 10, MY_BOX.y + 136), 11, theme.ACCENT)
         theme.ptext(surf, str(p.chips), (x + 28, MY_BOX.y + 120), 30, theme.ACCENT)
-        if p.hole and len(g.board) >= 3 and p.hole[0].value is not None:
+        if p.folded:
+            pass
+        elif p.hole and len(g.board) >= 3 and p.hole[0].value is not None:
             theme.ptext(surf, describe(evaluate(p.hole + g.board)), (MY_BOX.x + 30, MY_BOX.y + 186), 18, theme.INFO)
         elif p.hole and p.hole[0].value is not None:
             a, b = p.hole
@@ -782,6 +910,22 @@ class PokerScene(Scene):
             b.enabled = bool(bounds)
         self.btn_hint.visible = self.app.settings.hints
         self.btn_hint.enabled = my_turn
+        # Not your turn yet? Queue a move instead. Folded? Skip ahead.
+        queue = not my_turn and self.can_queue()
+        fast = not my_turn and not queue and not self.networked and g.phase == "playing" and not self.me.live
+        for b in self.action_buttons:
+            b.visible = not queue and not fast
+        to_call_now = g.to_call(HUMAN) if g.phase == "playing" else 0
+        for b, what in zip(self.pre_buttons, ("check_fold", "check", "call_any")):
+            b.visible = queue
+            on = self.pre == what
+            b.color, b.text_color = ("ACCENT", "OUTLINE") if on else ("PANEL_LIGHT", "TEXT")
+            label = {"check_fold": "CHECK / FOLD", "check": "CHECK", "call_any": "CALL ANY"}[what]
+            b.label = ("[X] " if on else "") + label
+            b.enabled = what != "check" or not to_call_now
+        self.btn_fast.visible = fast
+        self.btn_fast.enabled = not self.fast
+        self.btn_fast.label = "FAST FORWARDING..." if self.fast else "FAST FORWARD TO THE NEXT HAND"
         for b in self.buttons:
             b.draw(surf)
             if self.hint_action and b in self.action_buttons and b.visible:
@@ -803,6 +947,9 @@ class PokerScene(Scene):
             theme.ptext(surf, str(self.raise_to), (kx, SLIDER.centery), 12 if self.raise_to < 100 else 10,
                         theme.OUTLINE, None, anchor="center")
             theme.ptext(surf, str(lo), (track.x, SLIDER.bottom - 2), 11, theme.TEXT_DIM, anchor="topleft")
+            if self.typed:
+                theme.ptext(surf, f"TYPED {self.typed}", (SLIDER.centerx, SLIDER.y - 4), 11, theme.ACCENT,
+                            anchor="midbottom")
             theme.ptext(surf, str(hi), (track.right, SLIDER.bottom - 2), 11, theme.TEXT_DIM, anchor="topright")
         else:
             theme.ptext(surf, "PICK YOUR BET HERE ON YOUR TURN", SLIDER.center, 14, theme.TEXT_FAINT, anchor="center")
@@ -837,7 +984,8 @@ class PokerScene(Scene):
         profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 20)
         label, color = self.role(i)
         self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
         theme.ptext(surf, f"{p.chips} CHIPS", (rect.right - 18, rect.y + 12), 24, theme.ACCENT, anchor="topright")
@@ -900,7 +1048,9 @@ class PokerScene(Scene):
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
                 prof = profile_art.seat_profile(self, i)
                 profile_art.avatar(surf, (row.x + 34, row.centery), 20, prof, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                name_r = theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20,
+                                     profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                profile_art.name_tag(surf, name_r, prof, 16)
                 theme.chip(surf, (row.x + 300, row.centery + 2), 11, theme.ACCENT)
                 theme.ptext(surf, f"{p.chips} CHIPS", (row.x + 318, row.centery), 22, theme.ACCENT, anchor="midleft")
                 wins = sum(r == "won" for r in p.results)

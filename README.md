@@ -147,6 +147,10 @@ The fourth game on the main menu: no-limit Texas Hold'em for 2-6 players.
 - **Choosing your bet:** drag the chip along the slider, nudge it with **-/+** (or the arrow keys and mouse wheel), or tap **MIN**, **1/2 POT**, **POT** or **ALL IN**. The raise button always shows exactly what you'll put in.
 - **Winning:** after 15 hands (or when one player has every chip), the most chips wins. The chips you finish with go into your Chip Bank. Side pots are handled automatically when someone is all in.
 - **Hint** estimates your chance to win and compares it with the price of calling. Keys: F fold, C check/call, R raise.
+- **Queue your move:** while others play, tick **CHECK / FOLD**, **CHECK** or **CALL ANY** and it happens as soon as your turn comes (a queued CHECK is cancelled if someone bets).
+- **Your hand glows:** once the flop is out, the cards that make your hand are outlined, and at a showdown the winner's are too. The status bar shows what you need to call and your pot odds.
+- **Type a bet:** type a number (Backspace to fix it) to set your bet. Folded? **FAST FORWARD TO THE NEXT HAND** speeds up the rest of the hand (solo games).
+- The top-left box shows who won the last hand and how many hands you've won.
 
 **Computer players** only ever see their own cards and the board:
 - **Easy** calls too much and never bluffs.
@@ -225,6 +229,7 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 - **Levels:** you earn XP for what you do at the table: drawing and discarding, laying down and hitting in 10 Phases, books in Go Fish, hands in Blackjack, bets and pots in Poker, answers and wins in Cards Against Humanity, buying and building in Monopoly, and every spin in Slots. Every round you finish is worth 10 XP (30 if you went out), every game 50 XP, and winning adds 100 more. Going from level L to L+1 takes 100 + 25 x (L - 1) XP, up to level 100.
 - Level rewards: the Superstar picture (level 10), Royal background (15), Champion picture (25) and Diamond background (40).
 - Little "+XP" pops and an XP bar appear in the bottom-left as you play, and LEVEL UP! shows when you go up a level.
+- The developer (name: Shawn) gets a black **DEV** tag next to their name.
 - In multiplayer everyone sees each other's picture, background, name colour and level (everyone needs this version to play together). Computer players get their own.
 
 ## Slots

@@ -1290,6 +1290,7 @@ class MonopolyScene(Scene):
             surf.blit(img, img.get_rect(center=(r.x + 32, r.centery - 1)))
             name_r = theme.ptext(surf, self.name(j), (r.x + 64, r.y + 6), 18,
                                  profile_art.name_rgb(prof, self.clock) if not p.bankrupt else theme.TEXT_FAINT)
+            name_r = profile_art.name_tag(surf, name_r, prof, 12)
             badge = profile_art.level_badge(surf, (name_r.right + 22, name_r.centery), prof["l"], 12)
             name_r = name_r.union(badge)
             if p.difficulty:

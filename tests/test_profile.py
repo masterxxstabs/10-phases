@@ -270,3 +270,22 @@ def test_computers_have_varied_profiles():
     profs = [profile.ai_profile(n) for n in names]
     assert len({p["a"] for p in profs}) > 5 and len({p["b"] for p in profs}) > 5
     assert all(1 <= p["l"] <= 30 for p in profs)
+
+
+def test_dev_tag_for_shawn_in_any_capitalisation(app):
+    from ten_phases.ui import profile_art
+    s = app.settings
+    for name in ("shawn", "SHAWN", "Shawn", " sHaWn "):
+        s.player_name = name
+        assert profile.my_profile(s).get("d") is True
+    s.player_name = "SHAUN"
+    assert "d" not in profile.my_profile(s)
+    assert profile.player_profile(SimpleNamespace(name="Shawn", is_human=True, profile=None))["d"] is True
+    assert "d" not in profile.player_profile(SimpleNamespace(name="SHAWN", is_human=False, profile=None))
+    # A tag sent over the network means nothing: only the name counts.
+    assert "d" not in profile.clean_profile({"d": True})
+    assert "d" not in profile.player_profile(SimpleNamespace(name="BO", is_human=True, profile={"d": True}))
+    surf = pygame.Surface((300, 60))
+    r = profile_art.name_tag(surf, pygame.Rect(10, 10, 80, 20), {"d": True})
+    assert r.w > 80
+    s.player_name = "PLAYER"

@@ -14,6 +14,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 from dataclasses import dataclass, field
+from itertools import combinations
 
 from ..cards import COLORS, Card, Kind
 
@@ -106,6 +107,32 @@ def evaluate(cards) -> tuple:
     if pairs:
         return (PAIR, pairs[0], *[v for v in vals if v != pairs[0]][:3])
     return (HIGH_CARD, *vals[:5])
+
+
+def best_five(cards) -> list:
+    """The five cards that make the best hand among 5-7 cards."""
+    cards = list(cards)
+    if len(cards) <= 5:
+        return cards
+    return list(max(combinations(cards, 5), key=evaluate))
+
+
+def key_cards(cards) -> list:
+    """The cards that make the hand what it is (the pair, both pairs, the straight...), without kickers."""
+    best = best_five(cards)
+    if len(best) < 5:
+        return []
+    score = evaluate(best)
+    cat = score[0]
+    if cat in (PAIR, TRIPS, QUADS):
+        values = {score[1]}
+    elif cat in (TWO_PAIR, FULL_HOUSE):
+        values = {score[1], score[2]}
+    elif cat == HIGH_CARD:
+        return [max(best, key=lambda c: c.value)]
+    else:
+        return best   # straights and flushes use all five
+    return [c for c in best if c.value in values]
 
 
 def plural(value: int) -> str:

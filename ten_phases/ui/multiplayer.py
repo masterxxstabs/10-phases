@@ -8,7 +8,7 @@ from ..net.client import ClientSession
 from ..net.discovery import Browser
 from ..net.host import HostServer
 from ..net.protocol import CODE_ALPHABET, MAX_PLAYERS, NetError, clean_name
-from ..profile import clean_profile, my_profile
+from ..profile import clean_profile, is_dev, my_profile
 from ..settings import DIFFICULTY_CHOICES, SPEED_DELAYS
 from . import profile_art, sfx, theme
 from .menus import PRIMARY, Scene, backdrop, status_bar
@@ -37,6 +37,8 @@ class _Flash:
 def _seat_row(surf, rect: pygame.Rect, idx: int, name: str, kind: str, detail: str = "", you: bool = False,
               prof: dict | None = None, clock: float = 0.0):
     prof = clean_profile(prof)
+    if kind != "ai" and is_dev(name):
+        prof["d"] = True
     if prof["b"] == "classic":
         theme.rounded(surf, theme.PANEL_HOVER if you else theme.INNER, rect, 10)
     else:
@@ -44,6 +46,7 @@ def _seat_row(surf, rect: pygame.Rect, idx: int, name: str, kind: str, detail: s
     profile_art.avatar(surf, (rect.x + 28, rect.centery), 18, prof, idx)
     name_r = theme.ptext(surf, name + ("  (YOU)" if you else ""), (rect.x + 58, rect.centery), 18,
                          profile_art.name_rgb(prof, clock), anchor="midleft")
+    name_r = profile_art.name_tag(surf, name_r, prof, 13)
     profile_art.level_badge(surf, (name_r.right + 24, rect.centery), prof["l"], 12)
     label = {"host": "HOST", "guest": "PLAYER", "ai": f"AI {detail.upper()}"}[kind]
     img = theme.pixel_surface(label, 11, theme.OUTLINE, None)

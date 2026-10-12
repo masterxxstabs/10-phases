@@ -879,7 +879,8 @@ class GameScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 16)
         label, color = self.role_chip(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color, size=10)
         self._counts(surf, p, r.right - 12, r.y + 8, i)
@@ -1038,7 +1039,8 @@ class GameScene(Scene):
         bob = math.sin(self.clock * 6) * 2 if active else 0
         prof = profile_art.seat_profile(self, HUMAN)
         profile_art.avatar(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, prof, HUMAN, level=True)
-        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 18)
         x = MY_BOX.x + 140
         theme.mini_card_icon(surf, (x, MY_BOX.y + 15))
         theme.ptext(surf, str(len(h.hand)), (x + 20, MY_BOX.y + 12), 18)
@@ -1162,7 +1164,9 @@ class GameScene(Scene):
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
                 prof = profile_art.seat_profile(self, i)
                 profile_art.avatar(surf, (row.x + 34, row.centery), 19, prof, i)
-                theme.ptext(surf, self.display_name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                name_r = theme.ptext(surf, self.display_name(i), (row.x + 66, row.centery), 20,
+                                     profile_art.name_rgb(prof, self.clock), anchor="midleft")
+                profile_art.name_tag(surf, name_r, prof, 16)
                 if i != HUMAN and (p.difficulty or self.networked):
                     label, color = self.role_chip(i)
                     self._chip(surf, label, (row.x + 200, row.centery - 11), color, size=10)
@@ -1214,7 +1218,8 @@ class GameScene(Scene):
         # Name, role and phase
         prof = profile_art.seat_profile(self, i)
         profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        name_r = theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
+        profile_art.name_tag(surf, name_r, prof, 20)
         label, color = self.role_chip(i)
         self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
         if g.current == i and not g.round_over:
