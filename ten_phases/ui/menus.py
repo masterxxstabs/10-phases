@@ -44,7 +44,7 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "SLOTS")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "SLOTS")
 SINGLE_PLAYER = ("SLOTS",)
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
@@ -80,6 +80,12 @@ class MenuScene(Scene):
         rng = random.Random()
         if self.game == "SLOTS":
             self.fan = [None, None, None]   # three jackpot card backs
+        elif self.game == "POKER":
+            from ..poker.engine import poker_card
+            col = rng.choice(COLORS)
+            royal = [poker_card(col, v) for v in (10, 11, 12, 13, 14)]
+            quads = [poker_card(c, 14) for c in COLORS] + [poker_card(rng.choice(COLORS), 13)]
+            self.fan = royal if rng.random() < 0.5 else quads
         elif self.game == "BLACKJACK":
             from ..blackjack.engine import bj_card
             cols = rng.sample(COLORS, 4)
@@ -132,6 +138,9 @@ class MenuScene(Scene):
         elif self.game == "BLACKJACK":
             from .blackjack_scene import BlackjackScene
             self.app.go(BlackjackScene(self.app))
+        elif self.game == "POKER":
+            from .poker_scene import PokerScene
+            self.app.go(PokerScene(self.app))
         elif self.game == "GO FISH":
             from .gofish_scene import GoFishScene
             self.app.go(GoFishScene(self.app))
@@ -339,6 +348,17 @@ HOW_TO_BLACKJACK = [
     "Stuck? HINT shows the perfect basic-strategy move and why. Keys: H hit, S stand, D double, P split.",
 ]
 
+HOW_TO_POKER = [
+    "Texas Hold'em: make the best five-card hand from your two cards plus the five shared cards in the middle.",
+    "Everyone starts with 50 chips. Two players post blinds (1 and 2 to start, doubling every 5 hands).",
+    "There are four betting rounds: after your two cards, after the flop (3 shared cards), the turn and the river.",
+    "On your turn: FOLD to give up, CHECK when there's nothing to pay, CALL to match the bet, or RAISE.",
+    "Choose exactly how much to bet: drag the slider, use - and +, or tap MIN, 1/2 POT, POT or ALL IN.",
+    "Colors are the suits. Best hands: royal flush, straight flush, four of a kind, full house, flush, straight.",
+    "After 15 hands, most chips wins. The chips you finish with go into your CHIP BANK.",
+    "Not sure? HINT shows your chance to win and what to do. Keys: F fold, C check/call, R raise.",
+]
+
 HOW_TO_SLOTS = [
     "Slots plays with your real CHIP BANK: every spin costs your bet, and wins go straight back in.",
     "Pick a bet (1, 5, 10 or 25), then pull the lever, press SPIN or hit Space.",
@@ -346,7 +366,7 @@ HOW_TO_SLOTS = [
     "Three 10 PHASES cards is the JACKPOT: 300 times your bet!",
     "Any two cherries pay 2x, and a cherry on the first reel gives your bet back.",
     "Over time the machine pays back about 95% of what's bet, so it's for fun, not profit.",
-    "Out of chips? Win more playing 10 Phases, Go Fish or Blackjack.",
+    "Out of chips? Win more playing 10 Phases, Go Fish, Blackjack or Poker.",
 ]
 
 HOW_TO_FISH = [
@@ -379,13 +399,15 @@ class HowToScene(Scene):
 
     def draw(self, surf):
         backdrop(surf, self.clock)
-        title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES"}.get(
+        title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES",
+                 "POKER": "POKER RULES"}.get(
             self.game, "HOW TO PLAY")
         theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
-        for line in {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS}.get(self.game, HOW_TO):
+        rules = {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS, "POKER": HOW_TO_POKER}
+        for line in rules.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
                 theme.text(surf, chunk, (left.x + 44, y), 17, theme.TEXT, bold=False)
@@ -411,6 +433,11 @@ class HowToScene(Scene):
             theme.ptext(surf, "THREE 7s = 25x", (panel.x + 140, panel.y + 380), 18)
             self.back.draw(surf)
             status_bar(surf, f"Slots  -  10 Phases v{__version__}")
+            return
+        if self.game == "POKER":
+            _draw_poker_panel(surf, panel)
+            self.back.draw(surf)
+            status_bar(surf, f"Poker  -  10 Phases v{__version__}")
             return
         if self.game == "BLACKJACK":
             _draw_blackjack_panel(surf, panel)
@@ -458,6 +485,27 @@ def _draw_blackjack_panel(surf, panel):
         theme.ptext(surf, head, (panel.x + 24, panel.y + 260 + k * 70), 18, theme.ACCENT)
         theme.ptext(surf, line, (panel.x + 24, panel.y + 290 + k * 70), 15, theme.TEXT_DIM)
     theme.logo(surf, "21!", (panel.centerx, panel.bottom - 50), 52, angle=6)
+
+
+def _draw_poker_panel(surf, panel):
+    from ..poker.engine import poker_card
+    theme.ptext(surf, "WINNING HANDS", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+    c = COLORS
+    rows = [("ROYAL FLUSH", [(c[0], v) for v in (10, 11, 12, 13, 14)]),
+            ("STRAIGHT FLUSH", [(c[1], v) for v in (5, 6, 7, 8, 9)]),
+            ("FOUR OF A KIND", [(k, 9) for k in c] + [(c[0], 2)]),
+            ("FULL HOUSE", [(c[0], 13), (c[1], 13), (c[2], 13), (c[0], 4), (c[3], 4)]),
+            ("FLUSH", [(c[2], v) for v in (2, 6, 9, 11, 13)]),
+            ("STRAIGHT", [(c[0], 3), (c[1], 4), (c[3], 5), (c[2], 6), (c[0], 7)]),
+            ("THREE OF A KIND", [(c[0], 8), (c[1], 8), (c[3], 8)]),
+            ("TWO PAIR", [(c[0], 12), (c[2], 12), (c[1], 5), (c[3], 5)]),
+            ("PAIR", [(c[2], 14), (c[3], 14)])]
+    for k, (name, cards) in enumerate(rows):
+        y = panel.y + 58 + k * 52
+        theme.ptext(surf, f"{k + 1}. {name}", (panel.x + 24, y + 12), 15)
+        for n, (col, v) in enumerate(cards):
+            img, _ = card_with_shadow(poker_card(col, v), 30, 45)
+            surf.blit(img, (panel.x + 236 + n * 40, y))
 
 
 def _wrap(msg: str, size: int, width: int, pixel: bool = False) -> list[str]:

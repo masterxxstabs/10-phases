@@ -132,7 +132,7 @@ class SlotsScene(Scene):
                 self.bet_picker.value = str(self.bet)
                 self.last = f"Bet lowered to {self.bet} - that's what you can afford."
             else:
-                self.last = "Out of chips! Win more in 10 Phases, Go Fish or Blackjack."
+                self.last = "Out of chips! Win more in 10 Phases, Go Fish, Blackjack or Poker."
             return
         s = self.app.settings
         self.result = self.machine.spin(self.bet)
@@ -244,7 +244,7 @@ class SlotsScene(Scene):
         for x, y, _, _, life in self.coins:
             theme.chip(surf, (int(x), int(y)), 11, theme.ACCENT if int(life * 10) % 2 else theme.lighten(theme.ACCENT, 40))
         status_bar(surf, self.last if self.bank >= min(BETS) or self.spinning else
-                   "Out of chips! Win more in 10 Phases, Go Fish or Blackjack.")
+                   "Out of chips! Win more in 10 Phases, Go Fish, Blackjack or Poker.")
         if self.splash:
             title, sub, t, total = self.splash
             k = min(1.0, (total - t) / 0.25, t / 0.3)

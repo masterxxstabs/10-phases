@@ -201,8 +201,8 @@ class HostLobbyScene(Scene):
                                   self._set_ai, size=18)
         self.ai_level = Segmented((660, 646, 560, 50), list(DIFFICULTY_CHOICES), server.ai_level,
                                   lambda v: server.set_ai_level(v), size=16)
-        self.game_pick = Segmented((84, 640, 486, 50), ["10 PHASES", "GO FISH", "BLACKJACK"], server.game,
-                                   self._set_game, size=14)
+        self.game_pick = Segmented((84, 640, 486, 50), ["10 PHASES", "GO FISH", "BLACKJACK", "POKER"], server.game,
+                                   self._set_game, size=12)
         self.public_ip = TextInput((84, 512, 330, 50), "", max_len=15, placeholder="PUBLIC IP",
                                    allowed=lambda ch: ch.isdigit() or ch == ".", size=18, on_enter=self._set_ip)
         self.buttons = [
@@ -257,7 +257,10 @@ class HostLobbyScene(Scene):
             sfx.play("error")
             self.flash.show(str(e))
             return
-        if self.server.game == "BLACKJACK":
+        if self.server.game == "POKER":
+            from .poker_scene import PokerScene
+            self.app.go(PokerScene(self.app, host=self.server, session=session))
+        elif self.server.game == "BLACKJACK":
             from .blackjack_scene import BlackjackScene
             self.app.go(BlackjackScene(self.app, host=self.server, session=session))
         elif self.server.game == "GO FISH":
@@ -385,7 +388,10 @@ class GuestLobbyScene(Scene):
         if len(c.members) > before and before:
             sfx.play("coin")
         if c.game is not None and c.game.players:
-            if c.game_name == "BLACKJACK":
+            if c.game_name == "POKER":
+                from .poker_scene import PokerScene
+                self.app.go(PokerScene(self.app, client=c))
+            elif c.game_name == "BLACKJACK":
                 from .blackjack_scene import BlackjackScene
                 self.app.go(BlackjackScene(self.app, client=c))
             elif c.game_name == "GO FISH":

@@ -265,7 +265,7 @@ def test_full_blackjack_game_over_localhost():
         server.close()
 
 
-@pytest.mark.parametrize("game_name", ["10 PHASES", "GO FISH", "BLACKJACK"])
+@pytest.mark.parametrize("game_name", ["10 PHASES", "GO FISH", "BLACKJACK", "POKER"])
 def test_everyone_sees_everyone_elses_skins(game_name):
     server = HostServer("HOSTY", port=0, announce=False, game=game_name, skin=("neon", "galaxy"))
     try:
@@ -310,5 +310,59 @@ def test_malformed_moves_never_crash_the_host():
         errors = []
         assert wait_for(lambda: len(errors) >= len(bad),
                         lambda: (server.pump(), errors.extend(m for m in guest.poll() if m["t"] == "error")))
+    finally:
+        server.close()
+
+
+def test_full_poker_game_over_localhost():
+    from ten_phases.poker.ai import PokerAI
+
+    server = HostServer("HOSTY", port=0, announce=False, game="POKER")
+    try:
+        guests = [ClientSession(n, "127.0.0.1", server.port, server.key) for n in ("ANA", "BO")]
+
+        def pump_all():
+            server.pump()
+            for c in guests:
+                c.poll()
+        assert wait_for(lambda: all(c.status == "joined" and len(c.members) == 3 for c in guests), pump_all)
+        guests.sort(key=lambda c: c.my_index)
+        server.set_ai_count(1)
+        session = server.start_game()
+        game = session.game
+        game.hands_per_game = 6
+        assert wait_for(lambda: all(c.game is not None and c.game.players for c in guests), pump_all)
+        assert all(type(c.game).__name__ == "RemotePokerGame" for c in guests)
+        host_ai = PokerAI("Medium", random.Random(1))
+        guest_ai = [PokerAI("Hard", random.Random(2 + k)) for k in range(2)]
+        leaked = False
+        for _ in range(60000):
+            pump_all()
+            for c in guests:   # nobody may see another player's cards before a showdown
+                for k, p in enumerate(c.game.players[1:], 1):
+                    if k not in c.game.revealed and any(card.id != -1 for card in p.hole):
+                        leaked = True
+            if game.game_over:
+                break
+            if game.phase == "settled":
+                game.next_round()
+                continue
+            seat = game.current
+            if seat == 0 or seat in session.ais:
+                game.act(seat, *(session.ais.get(seat) or host_ai).choose(game, seat))
+                continue
+            rg = guests[seat - 1].game
+            if rg.pending or not rg.legal_actions(0):
+                time.sleep(0.001)
+                continue
+            rg.act(0, *guest_ai[seat - 1].choose(rg, 0))
+        assert game.game_over and not leaked
+        assert wait_for(lambda: all(c.game.game_over for c in guests), pump_all)
+        for c in guests:
+            seat = 1 + guests.index(c)
+            assert c.game.players[0].chips == game.players[seat].chips
+        # A guest can't sneak in a bad move.
+        guests[0].send({"t": "act", "a": "raise", "amount": "lots"})
+        pump_all()
     finally:
         server.close()

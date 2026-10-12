@@ -317,12 +317,14 @@ def test_random_clicking_never_crashes_any_screen(app):
     from ten_phases.ui.gofish_scene import GoFishScene
     from ten_phases.ui.menus import HowToScene, MenuScene, SettingsScene
     from ten_phases.ui.pack_open import PackOpenScene
+    from ten_phases.ui.poker_scene import PokerScene
     from ten_phases.ui.shop_scene import ShopScene
     from ten_phases.ui.slots_scene import SlotsScene
     from ten_phases import shop
 
     rng = random.Random(5)
-    makers = [lambda: GameScene(app), lambda: GoFishScene(app), lambda: BlackjackScene(app), lambda: SlotsScene(app),
+    makers = [lambda: GameScene(app), lambda: GoFishScene(app), lambda: BlackjackScene(app), lambda: PokerScene(app),
+              lambda: SlotsScene(app), lambda: HowToScene(app, "POKER"),
               lambda: ShopScene(app), lambda: ShopScene(app, tab="CARD FRONTS"), lambda: MenuScene(app),
               lambda: SettingsScene(app), lambda: CustomizeScene(app), lambda: HowToScene(app, "GO FISH"),
               lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng))]
@@ -348,3 +350,40 @@ def test_random_clicking_never_crashes_any_screen(app):
                 scene.handle(pygame.event.Event(pygame.KEYDOWN, key=rng.choice(keys), mod=0, unicode=""))
             scene.update(rng.choice([0.0, 1 / 60, 0.1]))
             scene.draw(app.screen)
+
+
+def test_poker_table_plays_a_whole_game_with_the_bet_picker(app):
+    from ten_phases.ui.poker_scene import SLIDER, PokerScene
+
+    app.settings.chip_bank = 0
+    app.settings.ai_speed = "Fast"
+    app.go(PokerScene(app))
+    scene = app.scene
+    scene.splash = None
+    picked = False
+    for _ in range(60 * 600):
+        _drive(app)
+        if scene.overlay == "game":
+            break
+        if scene.my_turn():
+            bounds = scene.raise_bounds()
+            if bounds and not picked:
+                lo, hi = bounds
+                # The slider, the nudge buttons and the shortcuts all stay inside the legal range.
+                scene.handle(pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=(SLIDER.right - 5, SLIDER.centery),
+                                                button=1))
+                scene.handle(pygame.event.Event(pygame.MOUSEBUTTONUP, pos=(SLIDER.right - 5, SLIDER.centery),
+                                                button=1))
+                assert scene.raise_to == hi
+                scene.nudge(-1)
+                assert scene.raise_to == max(lo, hi - 1)
+                scene.pick("min")
+                assert scene.raise_to == lo
+                scene.pick(1.0)
+                assert lo <= scene.raise_to <= hi
+                scene.act("raise")
+                picked = True
+                continue
+            scene.check_or_call()
+    assert picked and scene.overlay == "game"
+    assert app.settings.chip_bank == max(0, scene.me.chips)

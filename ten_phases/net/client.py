@@ -10,6 +10,7 @@ from ..skins import clean_skin
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
 from .bj_net import RemoteBlackjackGame
 from .fish_net import RemoteFishGame
+from .poker_net import RemotePokerGame
 from .snapshot import RemoteGame
 
 
@@ -77,7 +78,8 @@ class ClientSession:
                 self.game_name = msg.get("game", self.game_name)
             elif t == "start":
                 self.game_name = msg.get("game", "10 PHASES")
-                self.game = {"GO FISH": RemoteFishGame, "BLACKJACK": RemoteBlackjackGame}.get(
+                self.game = {"GO FISH": RemoteFishGame, "BLACKJACK": RemoteBlackjackGame,
+                             "POKER": RemotePokerGame}.get(
                     self.game_name, RemoteGame)(self.send)
             elif t == "to_lobby":
                 self.game = None

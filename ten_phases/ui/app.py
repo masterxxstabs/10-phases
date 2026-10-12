@@ -100,6 +100,10 @@ def smoke_test() -> None:
     app.running = True
     app.go(BlackjackScene(app))
     app.run(max_frames=90)
+    from .poker_scene import PokerScene
+    app.running = True
+    app.go(PokerScene(app))
+    app.run(max_frames=90)
     from .. import shop
     from .pack_open import PackOpenScene
     from .shop_scene import ShopScene

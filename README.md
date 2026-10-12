@@ -63,7 +63,7 @@ Requires Python 3.10+.
 
 Play with up to 5 friends, and fill any empty seats with computer players. There's no server to run, because one player's game hosts the table.
 
-**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES**, **GO FISH** or **BLACKJACK** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
+**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES**, **GO FISH**, **BLACKJACK** or **POKER** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
 - You get an invite code like `DAAAA-SCZH7-RE8PR`. **COPY CODE** puts it on your clipboard so you can send it to friends.
 - Choose how many computer players to add and their level, then press **START GAME** once your friends are in.
 - **KICK** removes a player from the lobby.
@@ -80,7 +80,7 @@ The first time you host, your firewall (for example Windows Defender Firewall) m
 
 **How it works**
 - The host's game is the only real copy of the game. Guests send their moves, and the host checks every one against the rules.
-- Each player only receives their own hand. Opponents' hands are sent as card counts. In Go Fish, a card someone fishes stays hidden unless it was the number they asked for.
+- Each player only receives their own hand. Opponents' hands are sent as card counts. In Go Fish, a card someone fishes stays hidden unless it was the number they asked for. In Poker, nobody sees anyone else's two cards until a showdown.
 - If a guest disconnects mid-game, a Medium computer player takes over their seat.
 - If the host leaves, guests are told and sent back to the menu.
 - When a game ends, the host can take everyone **BACK TO LOBBY** to play again.
@@ -137,6 +137,22 @@ The third game on the main menu. You and the other players each play against a c
 Return per chip bet over 20,000 simulated hands: Easy −6.7%, Medium −4.6%, Hard −0.2%, Expert +0.7%.
 
 Hovering a seat shows that player's chips, net for the game, current hands and recent results.
+
+## Poker
+
+The fourth game on the main menu: no-limit Texas Hold'em for 2-6 players.
+- **Cards:** 52 cards, 2-10, J, Q, K and A in the four colors (the colors are the suits). Make the best five-card hand from your two cards and the five shared ones.
+- **Chips:** everyone starts with 50. The blinds start at 1/2 and double every 5 hands.
+- **Betting:** four rounds (before the flop, the flop, the turn, the river). **FOLD**, **CHECK** or **CALL**, or **RAISE** any amount you like.
+- **Choosing your bet:** drag the chip along the slider, nudge it with **-/+** (or the arrow keys and mouse wheel), or tap **MIN**, **1/2 POT**, **POT** or **ALL IN**. The raise button always shows exactly what you'll put in.
+- **Winning:** after 15 hands (or when one player has every chip), the most chips wins. The chips you finish with go into your Chip Bank. Side pots are handled automatically when someone is all in.
+- **Hint** estimates your chance to win and compares it with the price of calling. Keys: F fold, C check/call, R raise.
+
+**Computer players** only ever see their own cards and the board:
+- **Easy** calls too much and never bluffs.
+- **Medium** plays by pot odds.
+- **Hard** sizes its bets to the pot and bluffs now and then.
+- **Expert** adds position, semi-bluffs, blind steals and varied bet sizes.
 
 ## Card Shop
 
@@ -252,6 +268,7 @@ ten_phases/
   ai.py         computer players and difficulty profiles
   gofish/       Go Fish rules (engine.py) and computer players (ai.py)
   blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
+  poker/        Texas Hold'em rules, hand ranking and side pots (engine.py), computer players and the Hint (ai.py)
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
   skins.py      every card skin and its rarity, including the generated ones
   shop.py       card packs (odds, opening, duplicates) and equipping skins

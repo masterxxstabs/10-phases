@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.8.0
+
+- New game: Texas Hold'em Poker! Arrow over to POKER on the main menu
+- Choose exactly how many chips to bet every round: drag the slider, tap - and +, or use MIN, 1/2 POT, POT and ALL IN
+- Computer players from Easy (calls everything) to Expert (bluffs and steals the blinds), plus a Hint that tells you your chance to win
+- Poker works in multiplayer too: pick POKER in the lobby (everyone needs this version to play together)
+
 ## 1.7.0
 
 - Card packs! Skins now come from Basic, Premium and Legendary packs that you rip open with a swipe

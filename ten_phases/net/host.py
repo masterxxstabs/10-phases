@@ -21,9 +21,10 @@ from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, cle
     local_ips, new_room_key
 from .bj_net import start_blackjack
 from .fish_net import start_fish
+from .poker_net import start_poker
 from .snapshot import events_for, snapshot_for, unrotate
 
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER")
 
 
 
@@ -203,9 +204,9 @@ class HostServer:
         if 1 + len(self.guests) + self.ai_count < 2:
             raise NetError("You need at least one other player or computer.")
         self.in_game = True
-        if self.game in ("GO FISH", "BLACKJACK"):
+        if self.game in ("GO FISH", "BLACKJACK", "POKER"):
             names = self._ai_names()
-            starter = start_fish if self.game == "GO FISH" else start_blackjack
+            starter = {"GO FISH": start_fish, "BLACKJACK": start_blackjack, "POKER": start_poker}[self.game]
             self.session = starter(self, names, [self._ai_level(k) for k in range(len(names))])
             self.dress(self.session.game.players)
             for g in self.guests:
