@@ -92,6 +92,10 @@ def smoke_test() -> None:
     app.running = True
     app.go(GameScene(app))
     app.run(max_frames=_arg_value("--smoke-frames", 120))
+    from .gofish_scene import GoFishScene
+    app.running = True
+    app.go(GoFishScene(app))
+    app.run(max_frames=90)
     pygame.quit()
     marker = os.environ.get("TEN_PHASES_SMOKE_MARKER")
     if marker:

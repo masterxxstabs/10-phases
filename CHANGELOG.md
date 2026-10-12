@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.3.0
+
+- New game: Go Fish! Use the arrows on the main menu to switch between 10 Phases and Go Fish
+- Go Fish has the same look, computer players from Easy to Expert, hints, and speech bubbles
+- Every Go Fish book you make adds 5 chips to your Chip Bank
+
 ## 1.2.2
 
 - Hint fixes: it now spots phases where two sets share a number (like 4444+W and 4+W)

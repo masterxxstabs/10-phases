@@ -150,3 +150,32 @@ def test_hovering_an_opponent_shows_their_info(app, monkeypatch):
     monkeypatch.setattr(scene, "_draw_player_info", lambda *a: (calls.append(a[1]), original(*a)))
     scene.draw(app.screen)
     assert calls == [seat]
+
+
+def test_menu_switches_games_and_go_fish_plays(app):
+    from ten_phases.ui.gofish_scene import GoFishScene
+    from ten_phases.ui.menus import MenuScene
+
+    app.settings.game = "10 PHASES"
+    menu = MenuScene(app)
+    menu.switch_game(1)
+    assert menu.game == app.settings.game == "GO FISH"
+    menu.draw(app.screen)
+    menu._play()
+    scene = app.scene
+    assert isinstance(scene, GoFishScene)
+    scene.splash = None
+    bank = app.settings.chip_bank
+    for _ in range(5000):
+        scene.update(0.2)
+        if scene.overlay == "game":
+            break
+        if scene.my_turn:
+            scene.do_hint()
+            target, value = scene.hint_ai.choose_ask(scene.game, 0)
+            scene.ask(target)
+        scene.draw(app.screen)
+    assert scene.game.game_over and scene.overlay == "game"
+    assert app.settings.chip_bank == bank + 5 * len(scene.me.books)
+    menu.switch_game(1)
+    assert app.settings.game == "10 PHASES"

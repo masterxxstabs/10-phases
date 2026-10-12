@@ -102,6 +102,22 @@ Choose **CUSTOMIZE** from the main menu, or from the pause menu during a game to
 
 Every panel, outline and shadow is generated from your table color, so any color you pick looks consistent. **RESET LOOK** puts everything back to the default blue.
 
+## Go Fish
+
+The main menu has arrows on both sides of the card fan (or use the **Left/Right** arrow keys) to switch between **10 PHASES** and **GO FISH**. The game remembers which one you picked last.
+
+Go Fish uses the same table, cards and look:
+- **Deck:** 48 cards, numbers 1–12 in four colors. A **book** is all four colors of one number.
+- **Your turn:** click a card in your hand, then click a player to ask them for that number.
+  - If they have any, they hand them all over and you go again.
+  - If not: **"GO FISH!"** You draw from the pond, and if you draw the number you asked for, you go again.
+- **Books** go down automatically. When all 12 are made, the most books wins, and each book adds 5 chips to your Chip Bank.
+- **Computer players** remember what's been asked out loud. Easy forgets quickly, Medium remembers a few turns, Hard remembers everything and weighs the odds, and Expert also tracks who said "go fish". In simulated 4-player games, the win rates were Easy 11%, Medium 22%, Hard 26% and Expert 40%.
+- **Helpers:** speech bubbles show every question and answer, the **BOOKS** board shows all 12 books and who made each, and **HINT** suggests who to ask for what.
+- **Hover:** hovering a player shows their books and, with Hints on, what they've asked for.
+
+Settings (opponents, AI level, speed, sounds, hints) and Customize apply to both games. Multiplayer is 10 Phases only for now.
+
 ## Knowing your phase
 
 - **Your Phase board** (middle right) shows your phase in big letters and a 10-step tracker. It has a slot for each group you need, such as "SET OF 3". With Hints on, each slot fills with the cards you already have toward it and shows your progress (for example "2/3"). Once you lay down, your groups sit in those slots, and you can click them to add more cards.
@@ -189,6 +205,8 @@ ten_phases/
   phases.py     phase definitions, set/run/color validation
   game.py       rules engine (turns, laying down, hitting, skips, scoring)
   ai.py         computer players and difficulty profiles
+  gofish/       Go Fish rules (engine.py) and computer players (ai.py)
+  names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions
 tools/          make_icon.py (app icon), build.py (PyInstaller one-file build),
