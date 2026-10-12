@@ -6,9 +6,7 @@ name: Build Windows exe
 #   tags that commit and publishes a GitHub Release with the exe. Bump the version to release.
 on:
   push:
-    branches: [master]
-    tags: ["v*"]
-    paths-ignore: ["README.md"]
+    branches: [ci-hang-probe]
   workflow_dispatch:
 
 permissions:
@@ -32,50 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller pillow pytest
 
-      - name: Run tests
-        run: python -m pytest -q
-
-      - name: Build exe
-        run: python tools/build.py
-
-      - name: Check the exe starts
+      - name: Probe the v1.11.0 test hang
+        timeout-minutes: 50
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath dist\10Phases.exe -ArgumentList "--smoke-test" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { throw "10Phases.exe --smoke-test exited with $($p.ExitCode)" }
-          "Smoke test passed; size: {0:N1} MB" -f ((Get-Item dist\10Phases.exe).Length / 1MB)
-
-      - name: Check self-updating works with the real exe
-        run: python tools/check_update.py
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: 10Phases-windows
-          path: dist/10Phases.exe
-
-      - name: Read version
-        id: version
-        shell: bash
-        run: |
-          ver=$(python -c "import ten_phases; print(ten_phases.__version__)")
-          echo "tag=v$ver" >> "$GITHUB_OUTPUT"
-          python tools/release_notes.py "$ver" > release_notes.md
-          if gh release view "v$ver" > /dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PYTHONIOENCODING: utf-8
-
-      # A new version number on master (or a pushed v* tag) publishes a Release with the exe.
-      - name: Publish release
-        if: steps.version.outputs.exists == 'false' || startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: 10 Phases ${{ steps.version.outputs.tag }}
-          target_commitish: ${{ github.sha }}
-          files: dist/10Phases.exe
-          body_path: release_notes.md
+          for ($i = 1; $i -le 8; $i++) {
+            Write-Host "=== run $i ==="
+            python -X faulthandler -m pytest -q -p no:cacheprovider --durations=8 -o faulthandler_timeout=90 tests
+          }
