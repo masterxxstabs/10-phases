@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.10.0
+
+- New game: Cards Against Humanity! Arrow over to it on the main menu (it's for adults)
+- Pick exactly which of the 71 packs go in the deck, how many blank cards are shuffled in, and the points to win
+- Blank cards let you write your own answer, and you can put a picture on them too (or turn pictures off)
+- Works in multiplayer: pick CAH in the lobby. Cards download once from the REST Against Humanity API, then work offline
+
 ## 1.9.0
 
 - New password-protected admin panel for the game's owner, opened from any card table

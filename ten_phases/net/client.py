@@ -9,6 +9,7 @@ from .. import __version__
 from ..skins import clean_skin
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
 from .bj_net import RemoteBlackjackGame
+from .cah_net import RemoteCahGame
 from .fish_net import RemoteFishGame
 from .poker_net import RemotePokerGame
 from .snapshot import RemoteGame
@@ -79,7 +80,7 @@ class ClientSession:
             elif t == "start":
                 self.game_name = msg.get("game", "10 PHASES")
                 self.game = {"GO FISH": RemoteFishGame, "BLACKJACK": RemoteBlackjackGame,
-                             "POKER": RemotePokerGame}.get(
+                             "POKER": RemotePokerGame, "CAH": RemoteCahGame}.get(
                     self.game_name, RemoteGame)(self.send)
             elif t == "to_lobby":
                 self.game = None
@@ -90,6 +91,10 @@ class ClientSession:
                     self.status = "closed"
                     self.error = "The host sent something this version doesn't understand."
                     self.leave()
+                continue
+            elif t == "img":
+                if self.game is not None and hasattr(self.game, "add_image"):
+                    self.game.add_image(msg.get("id"), msg.get("data"))
                 continue
             elif t == "error" and self.game is not None:
                 self.game.pending = False

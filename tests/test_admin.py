@@ -50,6 +50,26 @@ def _scene(app, name):
     return {"phases": GameScene, "fish": GoFishScene, "blackjack": BlackjackScene, "poker": PokerScene}[name](app)
 
 
+def test_admin_at_the_cah_table(app, unlocked):
+    from test_cah import fake_packs
+
+    from ten_phases.cah import cards as cc
+    from ten_phases.cah.engine import CahOptions
+    from ten_phases.ui.cah_scene import CahScene
+
+    scene = CahScene(app, packs=cc.normalize(fake_packs()), options=CahOptions(packs=[0, 1], blanks=0))
+    app.go(scene)
+    scene.admin.toggle()
+    before = len(scene.game.players[1].hand)
+    scene.admin._pick_target(1)
+    scene.admin._give_cah("blank")
+    scene.admin._give_cah("random")
+    hand = scene.game.players[1].hand
+    assert len(hand) == before + 2 and hand[-2].blank and not hand[-1].blank
+    scene.draw(app.screen)
+    scene.admin.close()
+
+
 @pytest.mark.parametrize("kind", ["phases", "fish", "blackjack", "poker"])
 def test_giving_cards_in_every_game(app, unlocked, kind):
     scene = _scene(app, kind)

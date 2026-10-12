@@ -12,6 +12,7 @@ SETTINGS_PATH = Path.home() / ".ten_phases_settings.json"
 
 DIFFICULTY_CHOICES = ("Easy", "Medium", "Hard", "Expert", "Mixed")
 SPEED_CHOICES = ("Slow", "Normal", "Fast")
+MAX_BLANKS = 60
 SPEED_DELAYS = {"Slow": 1.1, "Normal": 0.65, "Fast": 0.25}
 SFX_CHOICES = ("Off", "Low", "Medium", "High")
 TEXT_STYLES = ("Pixel", "Smooth")
@@ -40,6 +41,11 @@ class Settings:
     card_palette: str = "Classic"
     text_style: str = "Pixel"
     sparkles: bool = True
+    # Cards Against Humanity house options
+    cah_packs: list = field(default_factory=lambda: [0])   # pack ids in the deck (0 = the base set)
+    cah_blanks: int = 5                                      # blank cards shuffled into the deck
+    cah_images: bool = True                                  # blank cards can carry a picture
+    cah_points: int = 7                                      # points to win
 
     def reset_look(self) -> None:
         defaults = Settings()
@@ -94,10 +100,14 @@ class Settings:
         for attr, kind in (("face_style", "face"), ("back_style", "back")):
             if f"{kind}:{getattr(s, attr)}" not in s.owned_items:
                 setattr(s, attr, "classic")
-        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "SLOTS"):
+        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "SLOTS"):
             s.game = "10 PHASES"
         s.opponents = max(1, min(5, s.opponents))
         s.chip_bank = max(0, s.chip_bank)
+        s.cah_packs = sorted({p for p in s.cah_packs if isinstance(p, int) and not isinstance(p, bool) and p >= 0}) \
+            or [0]
+        s.cah_blanks = max(0, min(MAX_BLANKS, s.cah_blanks))
+        s.cah_points = max(3, min(20, s.cah_points))
         return s
 
     def save(self, path: Path | None = None) -> None:

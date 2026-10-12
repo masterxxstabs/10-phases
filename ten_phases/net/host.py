@@ -20,11 +20,12 @@ from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
     local_ips, new_room_key
 from .bj_net import start_blackjack
+from .cah_net import start_cah
 from .fish_net import start_fish
 from .poker_net import start_poker
 from .snapshot import events_for, snapshot_for, unrotate
 
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH")
 
 
 
@@ -47,6 +48,7 @@ class HostServer:
         self.ips = local_ips()
         self.ip_index = 0
         self.custom_ip: str | None = None
+        self.cah: tuple | None = None   # (packs, CahOptions) for Cards Against Humanity, set by the lobby
         self.listener = self._listen(port)
         self.port = self.listener.getsockname()[1]
         self.running = True
@@ -203,6 +205,23 @@ class HostServer:
     def start_game(self, ai_speed_delay: float = 0.0):
         if 1 + len(self.guests) + self.ai_count < 2:
             raise NetError("You need at least one other player or computer.")
+        if self.game == "CAH":
+            if not self.cah:
+                raise NetError("Load the card packs first: press CAH OPTIONS.")
+            if 1 + len(self.guests) + self.ai_count < 3:
+                raise NetError("Cards Against Humanity needs at least 3 players - add a computer.")
+            names = self._ai_names()
+            packs, options = self.cah
+            try:
+                self.session = start_cah(self, names, [self._ai_level(k) for k in range(len(names))], packs, options)
+            except ValueError as e:
+                raise NetError(str(e)) from None
+            self.in_game = True
+            self.dress(self.session.game.players)
+            for g in self.guests:
+                g.send({"t": "start", "game": self.game})
+            self.session.flush(force=True)
+            return self.session
         self.in_game = True
         if self.game in ("GO FISH", "BLACKJACK", "POKER"):
             names = self._ai_names()

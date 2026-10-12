@@ -44,7 +44,8 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "SLOTS")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "SLOTS")
+TITLES = {"CAH": "CARDS AGAINST HUMANITY"}
 SINGLE_PLAYER = ("SLOTS",)
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
@@ -78,7 +79,9 @@ class MenuScene(Scene):
 
     def _build_fan(self):
         rng = random.Random()
-        if self.game == "SLOTS":
+        if self.game == "CAH":
+            self.fan = []   # drawn as CAH cards in draw()
+        elif self.game == "SLOTS":
             self.fan = [None, None, None]   # three jackpot card backs
         elif self.game == "POKER":
             from ..poker.engine import poker_card
@@ -132,7 +135,10 @@ class MenuScene(Scene):
         self.app.go(ShopScene(self.app))
 
     def _play(self):
-        if self.game == "SLOTS":
+        if self.game == "CAH":
+            from .cah_setup import CahSetupScene
+            self.app.go(CahSetupScene(self.app))
+        elif self.game == "SLOTS":
             from .slots_scene import SlotsScene
             self.app.go(SlotsScene(self.app))
         elif self.game == "BLACKJACK":
@@ -231,7 +237,16 @@ class MenuScene(Scene):
             x = cx + (i - (n - 1) / 2) * 62
             y = 276 + abs(i - (n - 1) / 2) ** 2 * 5
             surf.blit(img, img.get_rect(center=(x, y)))
-        theme.logo(surf, self.game, (cx, 120), 92, angle=6)
+        if self.game == "CAH":
+            from . import cah_art
+            cards = [cah_art.black_card("Why can't I sleep at night? _", 1, 120, 168),
+                     cah_art.white_card("A big pile of cards.", 120, 168), cah_art.white_card("", 120, 168, blank=True)]
+            for i, img in enumerate(cards):
+                img = pygame.transform.rotozoom(img, (1 - i) * 9, 1)
+                surf.blit(img, img.get_rect(center=(cx + (i - 1) * 120, 276 + abs(i - 1) * 8)))
+        title = TITLES.get(self.game, self.game)
+        theme.logo(surf, title, (cx + (40 if len(title) >= 14 else 0), 120), 92 if len(title) < 14 else 46,
+                   angle=6 if len(title) < 14 else 3)
         self._draw_arrow(surf, ARROW_LEFT, -1)
         self._draw_arrow(surf, ARROW_RIGHT, 1)
         for k, name in enumerate(GAMES):  # which game is showing
@@ -248,7 +263,7 @@ class MenuScene(Scene):
             b.draw(surf)
         self._draw_update(surf)
         self._draw_bank(surf)
-        status_bar(surf, f"Press PLAY for {self.game}!   {info}   -   arrows switch games")
+        status_bar(surf, f"Press PLAY for {TITLES.get(self.game, self.game)}!   {info}   -   arrows switch games")
 
     def _draw_bank(self, surf):
         """Chips kept from finished games."""
@@ -359,6 +374,19 @@ HOW_TO_POKER = [
     "Not sure? HINT shows your chance to win and what to do. Keys: F fold, C check/call, R raise.",
 ]
 
+HOW_TO_CAH = [
+    "Cards Against Humanity is a party game for adults. Each round one player is the CARD CZAR.",
+    "The Czar's black card asks a question or has blanks. Everyone else plays their funniest white card(s).",
+    "Pick 2 or Pick 3 cards? Click them in order: the first fills the first blank.",
+    "The answers are shown without names. The Czar picks a favourite, and that player gets a point.",
+    "BLANK cards let you write your own answer, and add a picture if the game allows it "
+    "(drag an image onto the window, or BROWSE).",
+    "Before playing, choose which packs are in the deck, how many blank cards there are, pictures on or off, "
+    "and the points to win.",
+    "The first card download needs the internet; after that the cards are saved on your computer.",
+    "Each point is worth 10 chips for your CHIP BANK.",
+]
+
 HOW_TO_SLOTS = [
     "Slots plays with your real CHIP BANK: every spin costs your bet, and wins go straight back in.",
     "Pick a bet (1, 5, 10 or 25), then pull the lever, press SPIN or hit Space.",
@@ -400,13 +428,14 @@ class HowToScene(Scene):
     def draw(self, surf):
         backdrop(surf, self.clock)
         title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES",
-                 "POKER": "POKER RULES"}.get(
+                 "POKER": "POKER RULES", "CAH": "CARDS AGAINST HUMANITY"}.get(
             self.game, "HOW TO PLAY")
         theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
-        rules = {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS, "POKER": HOW_TO_POKER}
+        rules = {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS, "POKER": HOW_TO_POKER,
+                 "CAH": HOW_TO_CAH}
         for line in rules.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
@@ -433,6 +462,11 @@ class HowToScene(Scene):
             theme.ptext(surf, "THREE 7s = 25x", (panel.x + 140, panel.y + 380), 18)
             self.back.draw(surf)
             status_bar(surf, f"Slots  -  10 Phases v{__version__}")
+            return
+        if self.game == "CAH":
+            _draw_cah_panel(surf, panel)
+            self.back.draw(surf)
+            status_bar(surf, f"Cards Against Humanity  -  10 Phases v{__version__}")
             return
         if self.game == "POKER":
             _draw_poker_panel(surf, panel)
@@ -506,6 +540,25 @@ def _draw_poker_panel(surf, panel):
         for n, (col, v) in enumerate(cards):
             img, _ = card_with_shadow(poker_card(col, v), 30, 45)
             surf.blit(img, (panel.x + 236 + n * 40, y))
+
+
+def _draw_cah_panel(surf, panel):
+    from . import cah_art
+    theme.ptext(surf, "A ROUND", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+    black = cah_art.black_card("What's my secret power? _", 1, 170, 236)
+    surf.blit(pygame.transform.rotozoom(black, 5, 1), (panel.x + 24, panel.y + 60))
+    for k, text in enumerate(("Free refills.", "")):
+        card = cah_art.white_card(text, 150, 210, blank=not text)
+        surf.blit(pygame.transform.rotozoom(card, -4 - k * 6, 1), (panel.x + 210 + k * 100, panel.y + 90 + k * 20))
+    theme.ptext(surf, "The Czar reads the black card,", (panel.x + 24, panel.y + 350), 16)
+    theme.ptext(surf, "everyone answers with white cards,", (panel.x + 24, panel.y + 376), 16)
+    theme.ptext(surf, "and the funniest answer scores!", (panel.x + 24, panel.y + 402), 16)
+    theme.text(surf, "Cards: REST Against Humanity API.", (panel.x + 24, panel.bottom - 70), 13, theme.TEXT_FAINT,
+               bold=False)
+    theme.text(surf, "Cards Against Humanity is CC BY-NC-SA,", (panel.x + 24, panel.bottom - 52), 13,
+               theme.TEXT_FAINT, bold=False)
+    theme.text(surf, "Cards Against Humanity LLC.", (panel.x + 24, panel.bottom - 34), 13, theme.TEXT_FAINT,
+               bold=False)
 
 
 def _wrap(msg: str, size: int, width: int, pixel: bool = False) -> list[str]:

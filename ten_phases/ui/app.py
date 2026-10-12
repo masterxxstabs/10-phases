@@ -104,6 +104,13 @@ def smoke_test() -> None:
     app.running = True
     app.go(PokerScene(app))
     app.run(max_frames=90)
+    from ..cah.engine import CahOptions
+    from .cah_scene import CahScene
+    smoke_packs = [{"id": 0, "name": "Smoke test", "white": [f"Answer {k}." for k in range(80)],
+                    "black": [{"text": f"Question {k}: _", "pick": 1} for k in range(10)]}]
+    app.running = True
+    app.go(CahScene(app, packs=smoke_packs, options=CahOptions(blanks=3)))
+    app.run(max_frames=90)
     from .. import shop
     from .pack_open import PackOpenScene
     from .shop_scene import ShopScene

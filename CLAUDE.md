@@ -11,7 +11,8 @@
 
 ## How the project fits together
 
-- `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack, Poker, and Slots (single player). Each has a
+- `ten_phases/` is the app. Games: 10 Phases, Go Fish, Blackjack, Poker, Cards Against Humanity (`cah/`,
+  `ui/cah_scene.py`, `ui/cah_setup.py`, `net/cah_net.py`), and Slots (single player). Each has a
   rules engine with no UI (`game.py`, `gofish/engine.py`, `blackjack/engine.py`, `poker/engine.py`), computer
   players (`ai.py`, `gofish/ai.py`, `blackjack/ai.py`, `poker/ai.py`) and a table scene in `ui/`
   (`game_scene.py`, `gofish_scene.py`, `blackjack_scene.py`, `poker_scene.py`). The main menu's arrows switch games
@@ -31,6 +32,10 @@
   generator's output for an existing number: players own them and multiplayer relies on it.
 - Skins in multiplayer: each player's (face, back) goes in the hello and in every snapshot
   (`player.skin`). Scenes draw other seats' cards through `ui/table_skins.py`.
+- Cards Against Humanity cards are never committed: `cah/cards.py` downloads them from the REST
+  Against Humanity API (the owner asked for `https://www.restagainsthumanity.com/gql/`) and caches
+  them next to the settings file. Tests use made-up packs (`tests/test_cah.py:fake_packs`).
+  Pictures on blank cards travel as base64 JPEG in "img" messages, once per guest.
 - Admin panel (`ui/admin.py`): F12 at any card table, password-checked against the salted
   PBKDF2 hash in `admin_key.py` (set with `tools/set_admin_password.py`). Never put the
   plain password in the repo, release notes or tests. Each table scene creates `self.admin`,

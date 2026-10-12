@@ -303,6 +303,12 @@ def test_random_clicking_never_crashes_any_screen(app):
     from ten_phases.ui.gofish_scene import GoFishScene
     from ten_phases.ui.menus import HowToScene, MenuScene, SettingsScene
     from ten_phases.ui.pack_open import PackOpenScene
+    from test_cah import fake_packs
+
+    from ten_phases.cah import cards as cc
+    from ten_phases.cah.engine import CahOptions
+    from ten_phases.ui.cah_scene import CahScene
+    from ten_phases.ui.cah_setup import CahSetupScene
     from ten_phases.ui.poker_scene import PokerScene
     from ten_phases.ui.shop_scene import ShopScene
     from ten_phases.ui.slots_scene import SlotsScene
@@ -310,7 +316,9 @@ def test_random_clicking_never_crashes_any_screen(app):
 
     rng = random.Random(5)
     makers = [lambda: GameScene(app), lambda: GoFishScene(app), lambda: BlackjackScene(app), lambda: PokerScene(app),
-              lambda: SlotsScene(app), lambda: HowToScene(app, "POKER"),
+              lambda: SlotsScene(app), lambda: HowToScene(app, "POKER"), lambda: HowToScene(app, "CAH"),
+              lambda: CahScene(app, packs=cc.normalize(fake_packs()), options=CahOptions(packs=[0, 1], blanks=20)),
+              lambda: CahSetupScene(app),
               lambda: ShopScene(app), lambda: ShopScene(app, tab="CARD FRONTS"), lambda: MenuScene(app),
               lambda: SettingsScene(app), lambda: CustomizeScene(app), lambda: HowToScene(app, "GO FISH"),
               lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng))]

@@ -13,7 +13,7 @@ import secrets
 import socket
 import threading
 
-VERSION = 5   # 2: Go Fish multiplayer, 3: Blackjack, 4: card skins, 5: Poker
+VERSION = 6   # 2: Go Fish multiplayer, 3: Blackjack, 4: card skins, 5: Poker, 6: Cards Against Humanity
 GAME_PORT = 47610
 DISCOVERY_PORT = 47611
 MAX_LINE = 256 * 1024

@@ -63,7 +63,7 @@ Requires Python 3.10+.
 
 Play with up to 5 friends, and fill any empty seats with computer players. There's no server to run, because one player's game hosts the table.
 
-**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES**, **GO FISH**, **BLACKJACK** or **POKER** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
+**Host:** choose **MULTIPLAYER**, enter your name, then **HOST A GAME**. Pick **10 PHASES**, **GO FISH**, **BLACKJACK**, **POKER** or **CAH** under **GAME** in the lobby; it defaults to whichever game the main menu was showing.
 - You get an invite code like `DAAAA-SCZH7-RE8PR`. **COPY CODE** puts it on your clipboard so you can send it to friends.
 - Choose how many computer players to add and their level, then press **START GAME** once your friends are in.
 - **KICK** removes a player from the lobby.
@@ -153,6 +153,19 @@ The fourth game on the main menu: no-limit Texas Hold'em for 2-6 players.
 - **Medium** plays by pot odds.
 - **Hard** sizes its bets to the pot and bluffs now and then.
 - **Expert** adds position, semi-bluffs, blind steals and varied bet sizes.
+
+## Cards Against Humanity
+
+The fifth game on the main menu, for 3-6 players (computers fill empty seats). It's an adult party game.
+- **Each round** one player is the **Card Czar**. The Czar's black card asks a question or has blanks; everyone else plays their funniest white card(s). Pick 2 and Pick 3 cards fill the blanks in the order you click them.
+- The answers are shown without names. The Czar picks a favorite, and that player gets a point. First to the target score wins. Each point is worth 10 chips for your Chip Bank.
+- **Before the game** (PLAY, or **CAH OPTIONS** in the lobby) choose:
+  - **Packs:** any of the 71 packs, with each pack's white/black card counts shown. Use ALL, NONE or BASE SET ONLY.
+  - **Blank cards:** 0-60 blank white cards shuffled into the deck. Play one and you write your own answer.
+  - **Pictures on blank cards** on or off. When on, add a picture to a blank card by dragging an image file onto the game window, or press **BROWSE**. Pictures are shrunk and sent to everyone at the table.
+  - **Points to win:** 5, 7, 10 or 15.
+- **Cards** come from the [REST Against Humanity](https://www.restagainsthumanity.com/) API (`/gql/`, falling back to `/api/graphql` and the REST API). They download once and are saved next to your settings, so later games work offline. Only the host needs them; guests get the cards in play from the host.
+- Card text: Cards Against Humanity, [CC BY-NC-SA](https://creativecommons.org/licenses/by-nc-sa/2.0/), Cards Against Humanity LLC. This game is free and not affiliated with them.
 
 ## Admin panel
 
@@ -280,6 +293,7 @@ ten_phases/
   gofish/       Go Fish rules (engine.py) and computer players (ai.py)
   blackjack/    Blackjack rules (engine.py), computer players, basic strategy and the Hint (ai.py)
   poker/        Texas Hold'em rules, hand ranking and side pots (engine.py), computer players and the Hint (ai.py)
+  cah/          Cards Against Humanity: card download and cache (cards.py), rules (engine.py), computers (ai.py)
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
   skins.py      every card skin and its rarity, including the generated ones
   shop.py       card packs (odds, opening, duplicates) and equipping skins

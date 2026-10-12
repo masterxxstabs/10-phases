@@ -201,8 +201,9 @@ class HostLobbyScene(Scene):
                                   self._set_ai, size=18)
         self.ai_level = Segmented((660, 646, 560, 50), list(DIFFICULTY_CHOICES), server.ai_level,
                                   lambda v: server.set_ai_level(v), size=16)
-        self.game_pick = Segmented((84, 640, 486, 50), ["10 PHASES", "GO FISH", "BLACKJACK", "POKER"], server.game,
-                                   self._set_game, size=12)
+        self.game_pick = Segmented((84, 640, 486, 50), ["10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH"],
+                                   server.game, self._set_game, size=11)
+        self.btn_cah = Button((330, 600, 240, 34), "CAH OPTIONS", self._cah_options, size=13)
         self.public_ip = TextInput((84, 512, 330, 50), "", max_len=15, placeholder="PUBLIC IP",
                                    allowed=lambda ch: ch.isdigit() or ch == ".", size=18, on_enter=self._set_ip)
         self.buttons = [
@@ -213,6 +214,7 @@ class HostLobbyScene(Scene):
             Button((950, 712, 270, 56), "START GAME", self._start, size=22, **PRIMARY),
         ]
         self.start_button = self.buttons[-1]
+        self.buttons.append(self.btn_cah)
         self.kick_buttons: list[Button] = []
         self._kick_cache: dict = {}
 
@@ -249,7 +251,19 @@ class HostLobbyScene(Scene):
         self.app.settings.game = game
         self.app.settings.save()
 
+    def _cah_options(self):
+        from .cah_setup import CahSetupScene
+        self.app.go(CahSetupScene(self.app, mode="lobby", back=lambda: self.app.go(self), server=self.server))
+
     def _start(self):
+        if self.server.game == "CAH":
+            from ..cah.cards import library
+            from .cah_setup import options_from
+            lib = library()
+            if lib.packs:
+                self.server.cah = (lib.packs, options_from(self.app.settings))
+            elif lib.status != "loading":
+                lib.refresh()
         try:
             self.server.skin = (self.app.settings.face_style, self.app.settings.back_style)
             session = self.server.start_game(SPEED_DELAYS[self.app.settings.ai_speed])
@@ -257,7 +271,10 @@ class HostLobbyScene(Scene):
             sfx.play("error")
             self.flash.show(str(e))
             return
-        if self.server.game == "POKER":
+        if self.server.game == "CAH":
+            from .cah_scene import CahScene
+            self.app.go(CahScene(self.app, host=self.server, session=session))
+        elif self.server.game == "POKER":
             from .poker_scene import PokerScene
             self.app.go(PokerScene(self.app, host=self.server, session=session))
         elif self.server.game == "BLACKJACK":
@@ -328,6 +345,8 @@ class HostLobbyScene(Scene):
         theme.ptext(surf, "Invite codes change every time you host.", (84, 576), 12, theme.TEXT_FAINT)
         theme.ptext(surf, "GAME", (84, 612), 16, theme.ACCENT)
         self.game_pick.draw(surf)
+        self.btn_cah.visible = s.game == "CAH"
+        self.btn_cah.draw(surf)
 
         right = pygame.Rect(640, 110, 600, 586)
         theme.panel(surf, right)
@@ -388,7 +407,10 @@ class GuestLobbyScene(Scene):
         if len(c.members) > before and before:
             sfx.play("coin")
         if c.game is not None and c.game.players:
-            if c.game_name == "POKER":
+            if c.game_name == "CAH":
+                from .cah_scene import CahScene
+                self.app.go(CahScene(self.app, client=c))
+            elif c.game_name == "POKER":
                 from .poker_scene import PokerScene
                 self.app.go(PokerScene(self.app, client=c))
             elif c.game_name == "BLACKJACK":

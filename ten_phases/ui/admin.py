@@ -58,7 +58,7 @@ class PasswordInput(TextInput):
 
 def _kind(scene) -> str:
     return {"GameScene": "phases", "GoFishScene": "fish", "BlackjackScene": "blackjack",
-            "PokerScene": "poker"}.get(type(scene).__name__, "phases")
+            "PokerScene": "poker", "CahScene": "cah"}.get(type(scene).__name__, "phases")
 
 
 VALUES = {"phases": (1, 12), "fish": (1, 12), "blackjack": (1, 13), "poker": (2, 14)}
@@ -111,6 +111,16 @@ def give_card(scene, i: int, card, slot: int = 0) -> str:
         old = p.hole[slot]
         p.hole[slot] = card
         return f"Swapped {p.name}'s {old.label()} for the {card.label()}."
+    if kind == "cah":
+        from ..cah.engine import WhiteCard
+        if card == "random":
+            card = g._draw_white() if hasattr(g, "_draw_white") else None
+            if card is None:
+                raise ValueError("The white deck is empty.")
+            p.hand.append(card)
+            return f"Gave {p.name} a white card: \"{card.text[:40]}\"."
+        p.hand.append(WhiteCard("", g._new_id(), blank=True))
+        return f"Gave {p.name} a blank card."
     p.hand.append(card)
     if kind == "fish" and hasattr(g, "_collect_books"):
         g._collect_books(i)   # four of a kind becomes a book right away, as in play
@@ -218,7 +228,7 @@ class AdminPanel:
             sfx.play("error")
             return
         kind = _kind(self.scene)
-        card = make_card(kind, COLORS[self.color_k], self.value, self.special)
+        card = self.special if kind == "cah" else make_card(kind, COLORS[self.color_k], self.value, self.special)
         try:
             self.flash = give_card(self.scene, self.target, card, self.slot)
         except ValueError as e:
@@ -302,6 +312,12 @@ class AdminPanel:
         y = PANEL.bottom - 128
         x = PANEL.x + 250
         self.picker = []
+        if kind == "cah":
+            for n, (label, what) in enumerate((("GIVE BLANK CARD", "blank"), ("GIVE RANDOM CARD", "random"))):
+                b = Button((x + n * 250, y, 236, 48), label, lambda w=what: self._give_cah(w), "SUCCESS", "OUTLINE", 16)
+                b.enabled = self.can_edit and self.target is not None
+                self.picker.append(b)
+            return
         for n, col in enumerate(COLORS):
             b = Button((x + n * 64, y, 56, 48), "", lambda n=n: self._set_color(n), size=12)
             b.color = theme.CARD_COLORS[col]
@@ -331,6 +347,10 @@ class AdminPanel:
         self.picker.append(give)
         if not (lo <= self.value <= hi):
             self.value = max(lo, min(hi, self.value))
+
+    def _give_cah(self, what: str):
+        self.special = what
+        self._give()
 
     def _pick_target(self, i: int):
         self.target = i
@@ -416,6 +436,15 @@ class AdminPanel:
         area = pygame.Rect(r.x + 220, r.y + 6, r.w - 220 - 270, 52)
         step = min(38, (area.w - 34) / max(1, len(cards) - 1)) if len(cards) > 1 else 0
         for n, c in enumerate(cards):
+            if _kind(s) == "cah":
+                from . import cah_art
+                if c.id < 0:   # a guest's mirror doesn't know other hands
+                    img = pygame.Surface((34, 51))
+                    img.fill(cah_art.INK)
+                else:
+                    img = cah_art.white_card(c.text, 34, 51, c.blank)
+                surf.blit(img, (area.x + n * step, area.y))
+                continue
             known = c.color is not None or c.kind.value != "number"
             if getattr(c, "id", 0) < 0 or not known:
                 img, _ = card_with_shadow(None, 34, 51)    # a guest's mirror doesn't know other hands
@@ -433,6 +462,10 @@ class AdminPanel:
         theme.ptext(surf, "CARD TO GIVE", (PANEL.x + 24, y + 4), 16, theme.ACCENT)
         target = self.scene.game.players[self.target].name if self.target is not None else "nobody yet"
         theme.ptext(surf, f"TO: {target}", (PANEL.x + 24, y + 28), 13, theme.TEXT_DIM)
+        if kind == "cah":
+            for b in self.picker:
+                b.draw(surf)
+            return
         for n, b in enumerate(self.picker[:4]):
             b.draw(surf)
             if n == self.color_k and self.special is None:
