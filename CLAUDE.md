@@ -1,0 +1,34 @@
+# Project notes for Claude
+
+## Rules from the owner
+
+- **Every game gets multiplayer.** Any new game added to this project must support
+  network multiplayer (host/join via invite code, nearby games, lobby, computer
+  players filling seats) from the start, the same way 10 Phases and Go Fish do,
+  unless the owner explicitly says otherwise for that game.
+
+## How the project fits together
+
+- `ten_phases/` is the app. Each game has a rules engine with no UI (`game.py`,
+  `gofish/engine.py`), computer players (`ai.py`, `gofish/ai.py`) and a table scene
+  in `ui/` (`game_scene.py`, `gofish_scene.py`). The main menu's arrows switch games
+  (`ui/menus.py`, `GAMES`).
+- Multiplayer lives in `net/`. The host's engine is the only real game; guests get
+  per-player snapshots with seats rotated so they're seat 0, plus a "Remote…Game"
+  mirror that sends moves to the host. To add a game: a snapshot/events function,
+  a Remote mirror, a Host session (`handle_action`, `player_left`, `flush`), a lobby
+  `GAMES` entry, and a scene that accepts `host`/`session`/`client`. `net/fish_net.py`
+  is the smallest example. Bump `VERSION` in `net/protocol.py` when the wire format
+  changes.
+- Look and feel: everything is drawn in code (`ui/theme.py`, `ui/card_art.py`) in a
+  handheld DS style. Use the theme's color roles so Customize works. Text uses the
+  bundled pixel font through `theme.ptext`.
+
+## Releasing
+
+- Bump `__version__` in `ten_phases/__init__.py` and add a section to `CHANGELOG.md`.
+  Pushing to `master` builds the Windows exe in GitHub Actions, runs the tests and
+  exe checks, and publishes a Release. Players' games update themselves from it.
+- Before pushing, run `python -m pytest -q` and `python -m pyflakes ten_phases tests tools`.
+  For UI changes, drive the real scenes headless (`SDL_VIDEODRIVER=dummy`) and look at
+  screenshots.
