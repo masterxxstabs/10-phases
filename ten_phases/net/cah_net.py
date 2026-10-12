@@ -13,6 +13,7 @@ import random
 from ..cah.ai import CahAI
 from ..cah.engine import (BlackCard, CahEvent, CahGame, CahOptions, CahPlayer, RuleError, Submission, WhiteCard,
                           Written, image_id)
+from ..profile import clean_profile, player_profile
 from ..skins import clean_skin, player_skin
 from .protocol import Connection
 from .snapshot import rotate
@@ -47,6 +48,7 @@ def cah_snapshot_for(game: CahGame, viewer: int) -> dict:
             "name": game.players[r].name, "human": game.players[r].is_human, "difficulty": game.players[r].difficulty,
             "points": game.players[r].points, "submitted": game.players[r].submitted,
             "count": len(game.players[r].hand), "skin": list(player_skin(game.players[r])),
+            "prof": player_profile(game.players[r]),
             "hand": [[c.id, c.text, c.blank] for c in game.players[r].hand] if r == viewer else None,
         } for r in order],
     }
@@ -123,6 +125,7 @@ class RemoteCahGame:
             p = CahPlayer(d["name"], is_human=d["human"], difficulty=d["difficulty"])
             p.points, p.submitted = d["points"], d["submitted"]
             p.skin = clean_skin(d.get("skin"))
+            p.profile = clean_profile(d.get("prof"))
             p.hand = [WhiteCard(t, cid, bool(blank)) for cid, t, blank in d["hand"]] if d["hand"] is not None else \
                 [WhiteCard("", -1) for _ in range(d["count"])]
             players.append(p)

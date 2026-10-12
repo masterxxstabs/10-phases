@@ -15,6 +15,7 @@ from .. import __version__
 from ..ai import AIPlayer
 from ..game import Game, Player, RuleError
 from ..names import AI_NAMES
+from ..profile import ai_profile, clean_profile
 from ..skins import clean_skin, player_skin
 from .discovery import Beacon
 from .protocol import GAME_PORT, MAX_PLAYERS, VERSION, Connection, NetError, clean_name, drain, encode_invite, \
@@ -51,6 +52,7 @@ class HostServer:
         self.custom_ip: str | None = None
         self.cah: tuple | None = None   # (packs, CahOptions) for Cards Against Humanity, set by the lobby
         self.monopoly_rounds = 40       # set by the lobby
+        self.profile = clean_profile(None)   # the host's profile (picture, background, name colour, level)
         self.token = "car"              # the host's Monopoly piece
         self.listener = self._listen(port)
         self.port = self.listener.getsockname()[1]
@@ -121,9 +123,11 @@ class HostServer:
         self.broadcast_lobby()
 
     def members(self) -> list[dict]:
-        out = [{"name": self.name, "kind": "host"}]
-        out += [{"name": g.tag, "kind": "guest"} for g in self.guests]
-        out += [{"name": name, "kind": "ai", "difficulty": self._ai_level(k)} for k, name in enumerate(self._ai_names())]
+        out = [{"name": self.name, "kind": "host", "prof": self.profile}]
+        out += [{"name": g.tag, "kind": "guest", "prof": getattr(g, "profile", None) or clean_profile(None)}
+                for g in self.guests]
+        out += [{"name": name, "kind": "ai", "difficulty": self._ai_level(k), "prof": ai_profile(name)}
+                for k, name in enumerate(self._ai_names())]
         return out
 
     def _ai_names(self) -> list[str]:
@@ -198,6 +202,7 @@ class HostServer:
             k += 1
         conn.tag = name
         conn.skin = clean_skin(msg.get("skin"))
+        conn.profile = clean_profile(msg.get("prof"))
         conn.token = msg.get("token") if isinstance(msg.get("token"), str) else ""
         self.guests.append(conn)
         conn.send({"t": "welcome", "name": name, "host": self.name})
@@ -263,10 +268,13 @@ class HostServer:
     def dress(self, players) -> None:
         """Give every seat its skins: the host's, each guest's own, and a random pick for computers."""
         players[0].skin = self.skin
+        players[0].profile = self.profile
         for g, p in zip(self.guests, players[1:]):
             p.skin = getattr(g, "skin", ("classic", "classic"))
+            p.profile = getattr(g, "profile", None) or clean_profile(None)
         for p in players[1 + len(self.guests):]:
             p.skin = player_skin(p)
+            p.profile = ai_profile(p.name)
 
     def back_to_lobby(self):
         self._ai_pool = random.sample(AI_NAMES, len(AI_NAMES))  # new computer opponents for the rematch

@@ -7,6 +7,7 @@ import random
 
 from ..monopoly.ai import MonopolyAI
 from ..monopoly.engine import MEvent, MonopolyGame, MonopolyRules, MPlayer, RuleError
+from ..profile import clean_profile, player_profile
 from ..skins import clean_skin, player_skin
 from .protocol import Connection
 from .snapshot import rotate, unrotate
@@ -48,7 +49,7 @@ def mono_snapshot_for(game: MonopolyGame, viewer: int) -> dict:
             "difficulty": game.players[r].difficulty, "token": game.players[r].token, "cash": game.players[r].cash,
             "pos": game.players[r].pos, "in_jail": game.players[r].in_jail, "jail_turns": game.players[r].jail_turns,
             "goojf": list(game.players[r].goojf), "bankrupt": game.players[r].bankrupt,
-            "skin": list(player_skin(game.players[r])),
+            "skin": list(player_skin(game.players[r])), "prof": player_profile(game.players[r]),
         } for r in order],
     }
 
@@ -89,6 +90,7 @@ class RemoteMonopolyGame(MonopolyRules):
                         pos=d["pos"], in_jail=d["in_jail"], jail_turns=d["jail_turns"], goojf=list(d["goojf"]),
                         bankrupt=d["bankrupt"])
             p.skin = clean_skin(d.get("skin"))
+            p.profile = clean_profile(d.get("prof"))
             players.append(p)
         self.players = players
         for e in events:

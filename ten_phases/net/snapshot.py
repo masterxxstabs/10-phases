@@ -10,6 +10,7 @@ from __future__ import annotations
 from ..cards import Card, Color, Kind
 from ..game import Event, Meld, Player, RuleError
 from ..phases import GroupType, PHASES, partition_for_phase
+from ..profile import clean_profile, player_profile
 from ..skins import clean_skin, player_skin
 
 _KIND = {Kind.NUMBER: "n", Kind.WILD: "w", Kind.SKIP: "s"}
@@ -40,7 +41,7 @@ def snapshot_for(game, viewer: int) -> dict:
             "name": p.name, "human": p.is_human, "difficulty": p.difficulty, "phase": p.phase, "score": p.score,
             "chips": p.chips, "laid": p.laid_down, "skips": p.skips_pending, "done": p.completed_this_round,
             "count": len(p.hand), "hand": [card_out(c) for c in p.hand] if real == viewer else None,
-            "skin": list(player_skin(p)),
+            "skin": list(player_skin(p)), "prof": player_profile(p),
         })
     return {
         "round": game.round, "current": rotate(game.current, viewer, n), "drawn": game.has_drawn,
@@ -130,6 +131,7 @@ class RemoteGame:
             p = Player(d["name"], is_human=d["human"], difficulty=d["difficulty"])
             p.phase, p.score, p.chips = d["phase"], d["score"], d["chips"]
             p.skin = clean_skin(d.get("skin"))
+            p.profile = clean_profile(d.get("prof"))
             p.laid_down, p.skips_pending, p.completed_this_round = d["laid"], d["skips"], d["done"]
             if d["hand"] is not None:
                 p.hand = [self._card(c) for c in d["hand"]]

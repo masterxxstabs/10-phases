@@ -8,8 +8,9 @@ from ..net.client import ClientSession
 from ..net.discovery import Browser
 from ..net.host import HostServer
 from ..net.protocol import CODE_ALPHABET, MAX_PLAYERS, NetError, clean_name
+from ..profile import clean_profile, my_profile
 from ..settings import DIFFICULTY_CHOICES, SPEED_DELAYS
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .menus import PRIMARY, Scene, backdrop, status_bar
 from .widgets import Button, Segmented, TextInput, copy_text, paste_text
 
@@ -33,10 +34,17 @@ class _Flash:
             self.msg = None
 
 
-def _seat_row(surf, rect: pygame.Rect, idx: int, name: str, kind: str, detail: str = "", you: bool = False):
-    theme.rounded(surf, theme.PANEL_HOVER if you else theme.INNER, rect, 10)
-    theme.face(surf, (rect.x + 28, rect.centery), 18, idx)
-    theme.ptext(surf, name + ("  (YOU)" if you else ""), (rect.x + 58, rect.centery), 18, anchor="midleft")
+def _seat_row(surf, rect: pygame.Rect, idx: int, name: str, kind: str, detail: str = "", you: bool = False,
+              prof: dict | None = None, clock: float = 0.0):
+    prof = clean_profile(prof)
+    if prof["b"] == "classic":
+        theme.rounded(surf, theme.PANEL_HOVER if you else theme.INNER, rect, 10)
+    else:
+        profile_art.panel(surf, rect, prof["b"], clock, edge=theme.ACCENT if you else theme.PANEL_EDGE, edge_w=2)
+    profile_art.avatar(surf, (rect.x + 28, rect.centery), 18, prof, idx)
+    name_r = theme.ptext(surf, name + ("  (YOU)" if you else ""), (rect.x + 58, rect.centery), 18,
+                         profile_art.name_rgb(prof, clock), anchor="midleft")
+    profile_art.level_badge(surf, (name_r.right + 24, rect.centery), prof["l"], 12)
     label = {"host": "HOST", "guest": "PLAYER", "ai": f"AI {detail.upper()}"}[kind]
     img = theme.pixel_surface(label, 11, theme.OUTLINE, None)
     chip = pygame.Rect(0, 0, img.get_width() + 14, img.get_height() + 4)
@@ -90,6 +98,7 @@ class MultiplayerScene(Scene):
     def _host(self):
         try:
             server = HostServer(self._player_name(), game=self.app.settings.game, skin=self._skin())
+            server.profile = my_profile(self.app.settings)
         except NetError as e:
             sfx.play("error")
             self.flash.show(str(e))
@@ -113,7 +122,7 @@ class MultiplayerScene(Scene):
             return
         try:
             client = ClientSession.from_code(self._player_name(), self.code.value, self._skin(),
-                                            self.app.settings.monopoly_token)
+                                            self.app.settings.monopoly_token, my_profile(self.app.settings))
         except NetError as e:
             sfx.play("error")
             self.flash.show(str(e))
@@ -124,7 +133,7 @@ class MultiplayerScene(Scene):
     def _join_nearby(self, game: dict):
         self._leave()
         client = ClientSession(self._player_name(), game["ip"], game["port"], game["key"], self._skin(),
-                               self.app.settings.monopoly_token)
+                               self.app.settings.monopoly_token, my_profile(self.app.settings))
         self.app.go(GuestLobbyScene(self.app, client))
 
     def handle(self, event):
@@ -275,6 +284,7 @@ class HostLobbyScene(Scene):
                 lib.refresh()
         try:
             self.server.skin = (self.app.settings.face_style, self.app.settings.back_style)
+            self.server.profile = my_profile(self.app.settings)
             session = self.server.start_game(SPEED_DELAYS[self.app.settings.ai_speed])
         except NetError as e:
             sfx.play("error")
@@ -373,7 +383,8 @@ class HostLobbyScene(Scene):
             row = pygame.Rect(660, 176 + k * 58, 560, 50)
             if k < len(members):
                 m = members[k]
-                chip = _seat_row(surf, row, k, m["name"], m["kind"], m.get("difficulty", ""), you=k == 0)
+                chip = _seat_row(surf, row, k, m["name"], m["kind"], m.get("difficulty", ""), you=k == 0,
+                                 prof=m.get("prof"), clock=self.clock)
                 if m["kind"] == "guest":
                     kb = self.kick_buttons[k - 1]
                     kb.rect.midright = (chip.x - 10, row.centery)
@@ -459,6 +470,7 @@ class GuestLobbyScene(Scene):
         theme.ptext(surf, sub, (box.centerx, box.y + 70), 15, theme.TEXT_DIM, anchor="center")
         for k, m in enumerate(c.members[:MAX_PLAYERS]):
             row = pygame.Rect(box.x + 40, box.y + 110 + k * 64, box.w - 80, 54)
-            _seat_row(surf, row, k, m["name"], m["kind"], m.get("difficulty", ""), you=k == c.my_index)
+            _seat_row(surf, row, k, m["name"], m["kind"], m.get("difficulty", ""), you=k == c.my_index,
+                      prof=m.get("prof"), clock=self.clock)
         self.leave.draw(surf)
         status_bar(surf, self.flash.msg or "The host picks the computer players and starts the game.")

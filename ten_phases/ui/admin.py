@@ -17,7 +17,7 @@ import pygame
 
 from .. import admin_key
 from ..cards import COLORS, number, skip, wild
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .widgets import Button, TextInput
 
@@ -486,7 +486,7 @@ class AdminPanel:
         p = s.game.players[i]
         r = self._row_rect(k)
         theme.rounded(surf, theme.PANEL_HOVER if self.target == i else theme.INNER, r, 10)
-        theme.face(surf, (r.x + 30, r.centery), 20, i)
+        profile_art.avatar(surf, (r.x + 30, r.centery), 20, profile_art.seat_profile(s, i), i)
         theme.ptext(surf, p.name if i or p.name == "YOU" else f"{p.name} (YOU)", (r.x + 58, r.y + 8), 18)
         role = "YOU" if i == 0 else "GUEST" if p.is_human else (p.difficulty or "COMPUTER").upper()
         if _kind(s) == "mono":

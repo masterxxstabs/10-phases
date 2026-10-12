@@ -8,12 +8,14 @@ import random
 import pygame
 
 from ..cards import wild
+from ..levels import SPIN_XP
 from ..slots.engine import (BELL, BETS, CHERRY, JACKPOT, LEMON, ONE_CHERRY, SEVEN, STAR, THREE, TWO_CHERRIES, WILD,
                             SlotMachine)
 from . import sfx, theme
 from .card_art import render_card
 from .menus import PRIMARY, Scene, backdrop, status_bar
 from .widgets import Button, Segmented
+from .xp import XpTracker
 
 SPLIT_Y = 222
 CABINET = pygame.Rect(300, 238, 680, 380)
@@ -107,6 +109,7 @@ class SlotsScene(Scene):
         self.btn_spin = Button((CONTROLS.x + 610, CONTROLS.y + 30, 200, 76), "SPIN", self.spin, size=32, **PRIMARY)
         self.btn_menu = Button((CONTROLS.right - 130, CONTROLS.y + 40, 112, 56), "MENU", self.to_menu, size=18)
         self.lever_rect = pygame.Rect(CABINET.right - 6, CABINET.y + 40, 70, 260)
+        self.xp = XpTracker(self, "slots")
 
     # ---------------------------------------------------------------- actions
 
@@ -156,6 +159,7 @@ class SlotsScene(Scene):
         self.spinning = None
         self.unseen_win = 0
         self.session_net += r.win - r.bet
+        self.xp.gain(SPIN_XP + (3 if r.win else 0) + (20 if r.multiplier >= 25 else 0))
         if r.win:
             self.win_flash = 2.5
             self.last = f"{r.name}! You win {r.win} chips ({r.multiplier}x)"
@@ -204,6 +208,7 @@ class SlotsScene(Scene):
 
     def update(self, dt: float):
         super().update(dt)
+        self.xp.update(dt)
         self.lever = max(0.0, self.lever - dt * 2.2)
         self.win_flash = max(0.0, self.win_flash - dt)
         if self.splash:
@@ -245,6 +250,7 @@ class SlotsScene(Scene):
             theme.chip(surf, (int(x), int(y)), 11, theme.ACCENT if int(life * 10) % 2 else theme.lighten(theme.ACCENT, 40))
         status_bar(surf, self.last if self.bank >= min(BETS) or self.spinning else
                    "Out of chips! Win more in 10 Phases, Go Fish, Blackjack or Poker.")
+        self.xp.draw(surf)
         if self.splash:
             title, sub, t, total = self.splash
             k = min(1.0, (total - t) / 0.25, t / 0.3)

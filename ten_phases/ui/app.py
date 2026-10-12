@@ -36,7 +36,14 @@ class App:
         self.scene = MenuScene(self)
 
     def go(self, scene) -> None:
+        self._flush_xp()
         self.scene = scene
+
+    def _flush_xp(self) -> None:
+        """XP earned at a table is saved when you leave it (and every few seconds while you play)."""
+        xp = getattr(getattr(self, "scene", None), "xp", None)
+        if xp is not None and xp._unsaved:
+            xp.save()
 
     def quit(self) -> None:
         self.running = False
@@ -61,6 +68,7 @@ class App:
             dt = min(self.clock.tick(60) / 1000.0, 0.1)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self._flush_xp()
                     self.running = False
                 else:
                     self.scene.handle(event)
@@ -124,7 +132,9 @@ def smoke_test() -> None:
     from .shop_scene import ShopScene
     from .slots_scene import SlotsScene
     pulls = shop.open_pack(shop.PACK_BY_ID["legendary"], set())   # just for show: nothing is saved
-    for scene in (ShopScene(app), ShopScene(app, tab="CARD BACKS"), SlotsScene(app),
+    from .profile_scene import ProfileScene
+    for scene in (ShopScene(app), ShopScene(app, tab="CARD BACKS"), ShopScene(app, tab="PICTURES"), SlotsScene(app),
+                  ProfileScene(app),
                   PackOpenScene(app, "legendary", pulls)):
         app.running = True
         app.go(scene)

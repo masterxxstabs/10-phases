@@ -21,12 +21,13 @@ from ..monopoly.board import GO_SALARY, GROUPS, JAIL, JAIL_FINE, SETS, SQUARES
 from ..monopoly.engine import MonopolyGame, MPlayer, RuleError
 from ..names import pick_ai_names
 from . import monopoly_art as art
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .admin import AdminPanel
 from .game_scene import DIFF_COLORS
 from .menus import Scene, status_bar
 from .table_skins import TableSkins
 from .widgets import Button
+from .xp import XpTracker
 
 HUMAN = 0
 PANEL = pygame.Rect(784, 10, 482, 756)
@@ -118,6 +119,7 @@ class MonopolyScene(Scene):
             self.ais = {i + 1: MonopolyAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "monopoly")
         self.speed = SPEED.get(s.ai_speed, 1.0)
         self.rng = random.Random()
         g = self.game
@@ -263,6 +265,7 @@ class MonopolyScene(Scene):
         self.queue += self.game.pop_events()
 
     def _start(self, ev) -> Anim:
+        self.xp.event(ev)
         k, i = ev.kind, ev.player
         sp = self.speed
         if k == "turn":
@@ -629,6 +632,7 @@ class MonopolyScene(Scene):
         restart = lambda: self.app.go(MonopolyScene(self.app))  # noqa: E731
         if kind == "game":
             sfx.play("game_win" if HUMAN in self.game.winners() else "game_lose")
+            self.xp.game_end(HUMAN in self.game.winners())
             if self._banked is None:
                 self._banked = max(0, self.game.net_worth(HUMAN)) // CHIPS_PER
                 self.app.settings.chip_bank += self._banked
@@ -942,6 +946,7 @@ class MonopolyScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -1052,6 +1057,7 @@ class MonopolyScene(Scene):
         if self.overlay:
             self._draw_overlay(surf)
             self._draw_sparks(surf, True)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     def _status(self) -> str:
@@ -1273,13 +1279,19 @@ class MonopolyScene(Scene):
             active = g.current == j and not g.game_over
             acting = g.actor() == j and not self.animating
             edge = theme.ACCENT if active else theme.PANEL_EDGE
-            theme.panel(surf, r, fill="PANEL_HOVER" if acting else "PANEL", edge=edge, edge_w=3 if active else 2)
+            prof = profile_art.seat_profile(self, j)
+            if prof["b"] == "classic":
+                theme.panel(surf, r, fill="PANEL_HOVER" if acting else "PANEL", edge=edge, edge_w=3 if active else 2)
+            else:
+                profile_art.panel(surf, r, prof["b"], self.clock, edge=edge, edge_w=3 if active else 2)
             pygame.draw.circle(surf, theme.OUTLINE, (r.x + 32, r.centery + 2), 24)
             pygame.draw.circle(surf, theme.lighten(self.color(j), 30), (r.x + 32, r.centery), 24)
             img = art.token(p.token, self.color(j), 34)
             surf.blit(img, img.get_rect(center=(r.x + 32, r.centery - 1)))
             name_r = theme.ptext(surf, self.name(j), (r.x + 64, r.y + 6), 18,
-                                 theme.TEXT if not p.bankrupt else theme.TEXT_FAINT)
+                                 profile_art.name_rgb(prof, self.clock) if not p.bankrupt else theme.TEXT_FAINT)
+            badge = profile_art.level_badge(surf, (name_r.right + 22, name_r.centery), prof["l"], 12)
+            name_r = name_r.union(badge)
             if p.difficulty:
                 theme.ptext(surf, p.difficulty.upper(), (r.x + 64, r.y + 30), 11, DIFF_COLORS.get(p.difficulty,
                                                                                                    theme.TEXT_DIM))

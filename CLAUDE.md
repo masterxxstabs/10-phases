@@ -56,3 +56,7 @@
 - Monopoly: the engine runs instantly and emits `MEvent`s; `ui/monopoly_scene.py` replays them one at a time as
   animations, and the action panel waits (`settled()`) until moves and cards have played out. Board, rents and
   cards follow monopyly (MIT). Keep the whole-game invariant test in `tests/test_monopoly.py` passing.
+- Profiles and levels: `profile.py` (catalog, buying, `my_profile`/`clean_profile`/`player_profile`), `levels.py`
+  (XP table and curve), `ui/profile_art.py` (pictures, backgrounds, `seat_profile(scene, i)`), `ui/profile_scene.py`.
+  Each table makes `self.xp = XpTracker(self, game)` (`ui/xp.py`), feeds it engine events, calls `game_end`, and
+  draws it before the admin panel. Profiles travel like skins: "prof" in the hello and in every snapshot.

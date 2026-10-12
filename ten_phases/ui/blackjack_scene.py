@@ -15,13 +15,14 @@ from ..blackjack.ai import BlackjackAI
 from ..blackjack.engine import MAX_BET, MIN_BET, BJPlayer, BlackjackGame, RuleError, hand_value
 from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .admin import AdminPanel
 from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, backdrop, status_bar
 from .widgets import Button
+from .xp import XpTracker
 
 HUMAN = 0
 SPLIT_Y = 222
@@ -63,6 +64,7 @@ class BlackjackScene(Scene):
             self.ais = {i + 1: BlackjackAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "blackjack")
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.bet_amount = 5
         self.anims: list[FlyingCard] = []
@@ -184,6 +186,7 @@ class BlackjackScene(Scene):
         g = self.game
         stagger = 0.0
         for ev in g.pop_events():
+            self.xp.event(ev)
             k = ev.kind
             if k in ("deal", "hit", "double", "split", "dealer_hit"):
                 if ev.player is None:
@@ -343,6 +346,7 @@ class BlackjackScene(Scene):
         restart = lambda: self.app.go(BlackjackScene(self.app))  # noqa: E731
         if kind == "game":
             sfx.play("game_win" if HUMAN in self.game.winners() else "game_lose")
+            self.xp.game_end(HUMAN in self.game.winners())
             if self._banked is None:
                 self._banked = max(0, self.me.chips)
                 self.app.settings.chip_bank += self._banked
@@ -416,6 +420,7 @@ class BlackjackScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -475,6 +480,7 @@ class BlackjackScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     def _status(self) -> str:
@@ -565,8 +571,9 @@ class BlackjackScene(Scene):
         active = g.turn is not None and g.turn[0] == i
         theme.panel(surf, r, edge=theme.ACCENT if active else theme.PANEL_EDGE, edge_w=3 if active else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
+        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18, profile_art.name_rgb(prof, self.clock))
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 32), color)
         theme.chip(surf, (r.x + 22, r.y + 74), 9, theme.ACCENT)
@@ -598,8 +605,9 @@ class BlackjackScene(Scene):
         active = self.my_turn() or self.can_bet()
         theme.panel(surf, MY_BOX, edge=theme.ACCENT if active else theme.PANEL_EDGE, edge_w=3 if active else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, HUMAN)
-        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22)
+        prof = profile_art.seat_profile(self, HUMAN)
+        profile_art.avatar(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, prof, HUMAN, level=True)
+        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
         theme.chip(surf, (MY_BOX.x + 34, MY_BOX.y + 84), 13, theme.ACCENT)
         theme.ptext(surf, str(p.chips), (MY_BOX.x + 56, MY_BOX.y + 70), 28, theme.ACCENT)
         net = f"+{p.net}" if p.net > 0 else str(p.net)
@@ -684,9 +692,10 @@ class BlackjackScene(Scene):
         box = self.seat_rect(i)
         w, h = 460, 214
         rect = pygame.Rect(max(10, min(theme.WIDTH - w - 10, box.centerx - w // 2)), box.y + 96, w, h)
-        theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
-        theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
+        profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
+        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
         label, color = self.role(i)
         self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
         theme.ptext(surf, f"{p.chips} CHIPS", (rect.right - 18, rect.y + 12), 24, theme.ACCENT, anchor="topright")
@@ -755,8 +764,9 @@ class BlackjackScene(Scene):
                 p = g.players[i]
                 row = pygame.Rect(panel.x + 30, 240 + k * 64, panel.w - 60, 56)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
-                theme.face(surf, (row.x + 34, row.centery), 20, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                prof = profile_art.seat_profile(self, i)
+                profile_art.avatar(surf, (row.x + 34, row.centery), 20, prof, i)
+                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
                 theme.chip(surf, (row.x + 300, row.centery + 2), 11, theme.ACCENT)
                 theme.ptext(surf, f"{p.chips} CHIPS", (row.x + 318, row.centery), 22, theme.ACCENT, anchor="midleft")
                 net = f"+{p.net}" if p.net > 0 else str(p.net)

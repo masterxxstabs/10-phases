@@ -48,6 +48,7 @@ GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "SLOTS
 TITLES = {"CAH": "CARDS AGAINST HUMANITY"}
 SINGLE_PLAYER = ("SLOTS",)
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
+PROFILE_CARD = pygame.Rect(20, 162, 250, 104)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
 
 
@@ -134,6 +135,10 @@ class MenuScene(Scene):
         from .shop_scene import ShopScene
         self.app.go(ShopScene(self.app))
 
+    def _profile(self):
+        from .profile_scene import ProfileScene
+        self.app.go(ProfileScene(self.app))
+
     def _play(self):
         if self.game == "MONOPOLY":
             from .monopoly_setup import MonopolySetupScene
@@ -166,7 +171,10 @@ class MenuScene(Scene):
         elif event.type == pygame.KEYDOWN and event.key in (pygame.K_LEFT, pygame.K_RIGHT):
             self.switch_game(-1 if event.key == pygame.K_LEFT else 1)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if ARROW_LEFT.collidepoint(event.pos):
+            if PROFILE_CARD.collidepoint(event.pos):
+                sfx.play("select")
+                self._profile()
+            elif ARROW_LEFT.collidepoint(event.pos):
                 self.switch_game(-1)
             elif ARROW_RIGHT.collidepoint(event.pos):
                 self.switch_game(1)
@@ -268,7 +276,32 @@ class MenuScene(Scene):
             b.draw(surf)
         self._draw_update(surf)
         self._draw_bank(surf)
+        self._draw_profile(surf)
         status_bar(surf, f"Press PLAY for {TITLES.get(self.game, self.game)}!   {info}   -   arrows switch games")
+
+    def _draw_profile(self, surf):
+        """Your picture, name, level and XP. Click it to change your profile."""
+        from ..levels import progress
+        from ..profile import my_profile
+        from . import profile_art
+        s = self.app.settings
+        prof = my_profile(s)
+        card = PROFILE_CARD
+        hover = card.collidepoint(pygame.mouse.get_pos())
+        profile_art.panel(surf, card, prof["b"], self.clock, edge=theme.ACCENT if hover else theme.PANEL_EDGE,
+                          edge_w=3 if hover else 2)
+        profile_art.avatar(surf, (card.x + 40, card.y + 42), 28, prof, 0)
+        profile_art.level_badge(surf, (card.x + 40, card.y + 76), prof["l"], 13)
+        theme.ptext(surf, s.player_name or "PLAYER", (card.x + 80, card.y + 14), 20,
+                    profile_art.name_rgb(prof, self.clock))
+        level, into, need = progress(s.xp)
+        theme.ptext(surf, f"LEVEL {level}", (card.x + 80, card.y + 42), 13, theme.TEXT_DIM)
+        bar = pygame.Rect(card.x + 80, card.y + 62, card.w - 96, 10)
+        pygame.draw.rect(surf, (50, 60, 90), bar, border_radius=5)
+        pygame.draw.rect(surf, (110, 220, 255), (bar.x, bar.y, max(6, int(bar.w * into / max(1, need))), bar.h),
+                         border_radius=5)
+        theme.ptext(surf, "EDIT PROFILE" if hover else f"{into}/{need} XP", (card.x + 80, card.y + 78), 11,
+                    theme.ACCENT if hover else theme.TEXT_FAINT)
 
     def _draw_bank(self, surf):
         """Chips kept from finished games."""

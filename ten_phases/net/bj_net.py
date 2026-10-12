@@ -12,6 +12,7 @@ import random
 from ..blackjack.ai import BlackjackAI
 from ..blackjack.engine import MAX_BET, MIN_BET, BJCard, BJEvent, BJPlayer, BlackjackGame, Hand, RuleError
 from ..cards import Kind
+from ..profile import clean_profile, player_profile
 from ..skins import clean_skin, player_skin
 from .protocol import Connection
 from .snapshot import _COLOR_BACK, _KIND_BACK, card_out, rotate
@@ -38,7 +39,7 @@ def bj_snapshot_for(game: BlackjackGame, viewer: int) -> dict:
             "name": game.players[r].name, "human": game.players[r].is_human, "difficulty": game.players[r].difficulty,
             "chips": game.players[r].chips, "bet": game.players[r].bet, "net": game.players[r].net,
             "results": game.players[r].results[-10:], "hands": [_hand_out(h) for h in game.players[r].hands],
-            "skin": list(player_skin(game.players[r])),
+            "skin": list(player_skin(game.players[r])), "prof": player_profile(game.players[r]),
         } for r in order],
     }
 
@@ -97,6 +98,7 @@ class RemoteBlackjackGame:
             p = BJPlayer(d["name"], is_human=d["human"], difficulty=d["difficulty"], chips=d["chips"])
             p.bet, p.net, p.results = d["bet"], d["net"], list(d["results"])
             p.skin = clean_skin(d.get("skin"))
+            p.profile = clean_profile(d.get("prof"))
             p.hands = [Hand(cards=[self._card(c) for c in h["cards"]], bet=h["bet"], doubled=h["doubled"],
                             split=h["split"], stood=h["stood"], result=h["result"], payout=h["payout"])
                        for h in d["hands"]]

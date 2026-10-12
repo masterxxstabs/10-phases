@@ -48,6 +48,11 @@ class Settings:
     cah_blanks: int = 5                                      # blank cards shuffled into the deck
     cah_images: bool = True                                  # blank cards can carry a picture
     cah_points: int = 7                                      # points to win
+    # Profile and level
+    avatar: str = "robot"          # profile picture
+    banner: str = "classic"        # background of your hover card
+    name_color: str = "WHITE"
+    xp: int = 0
     # Monopoly
     monopoly_rounds: int = 40      # the richest player wins after this many rounds
     monopoly_token: str = "car"    # your piece
@@ -101,7 +106,9 @@ class Settings:
         from .skins import BY_ID, FREE_IDS
         if not isinstance(s.owned_items, list):
             s.owned_items = []
-        s.owned_items = sorted({i for i in s.owned_items if isinstance(i, str) and i in BY_ID} | set(FREE_IDS))
+        from .profile import BY_ID as PROFILE_ITEMS
+        s.owned_items = sorted({i for i in s.owned_items if isinstance(i, str) and (i in BY_ID or i in PROFILE_ITEMS)}
+                               | set(FREE_IDS))
         for attr, kind in (("face_style", "face"), ("back_style", "back")):
             if f"{kind}:{getattr(s, attr)}" not in s.owned_items:
                 setattr(s, attr, "classic")
@@ -113,6 +120,13 @@ class Settings:
             or [0]
         s.cah_blanks = max(0, min(MAX_BLANKS, s.cah_blanks))
         s.cah_points = max(3, min(20, s.cah_points))
+        from . import profile
+        s.xp = max(0, s.xp)
+        for attr, kind in (("avatar", "avatar"), ("banner", "banner")):
+            if not profile.owns(s, f"{kind}:{getattr(s, attr)}"):
+                setattr(s, attr, "robot" if kind == "avatar" else "classic")
+        if not profile.color_unlocked(s, s.name_color):
+            s.name_color = "WHITE"
         if s.monopoly_rounds not in MONOPOLY_ROUNDS:
             s.monopoly_rounds = 40
         if s.monopoly_token not in MONOPOLY_TOKENS:

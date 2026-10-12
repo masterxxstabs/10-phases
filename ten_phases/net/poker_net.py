@@ -11,6 +11,7 @@ import random
 from ..cards import Kind
 from ..poker.ai import PokerAI
 from ..poker.engine import PokerCard, PokerEvent, PokerGame, PokerPlayer, PokerRules, RuleError
+from ..profile import clean_profile, player_profile
 from ..skins import clean_skin, player_skin
 from .protocol import Connection
 from .snapshot import _COLOR_BACK, _KIND_BACK, card_out, rotate
@@ -41,6 +42,7 @@ def poker_snapshot_for(game: PokerGame, viewer: int) -> dict:
             "all_in": game.players[r].all_in, "acted": game.players[r].acted, "in_hand": game.players[r].in_hand,
             "net": game.players[r].net, "results": game.players[r].results[-10:],
             "last": game.players[r].last_action, "skin": list(player_skin(game.players[r])),
+            "prof": player_profile(game.players[r]),
             "hole": [card_out(c) for c in game.players[r].hole] if _visible(game, r, viewer) else None,
             "count": len(game.players[r].hole),
         } for r in order],
@@ -110,6 +112,7 @@ class RemotePokerGame(PokerRules):
             p.acted, p.in_hand, p.net, p.results = d["acted"], d["in_hand"], d["net"], list(d["results"])
             p.last_action = d["last"]
             p.skin = clean_skin(d.get("skin"))
+            p.profile = clean_profile(d.get("prof"))
             p.hole = [self._card(c) for c in d["hole"]] if d["hole"] is not None else \
                 [PokerCard(Kind.NUMBER, None, None, id=-1) for _ in range(d["count"])]   # face down
             players.append(p)

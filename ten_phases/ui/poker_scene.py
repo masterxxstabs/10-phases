@@ -18,13 +18,14 @@ from ..poker import ai as poker_ai
 from ..poker.ai import PokerAI
 from ..poker.engine import HANDS_PER_LEVEL, PokerGame, PokerPlayer, RuleError, describe, evaluate
 from ..settings import SPEED_DELAYS
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, backdrop, status_bar
 from .admin import AdminPanel
 from .table_skins import TableSkins
 from .widgets import Button
+from .xp import XpTracker
 
 HUMAN = 0
 SPLIT_Y = 222
@@ -88,6 +89,7 @@ class PokerScene(Scene):
             self.ais = {i + 1: PokerAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "poker")
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.anims: list[FlyingCard] = []
         self.chips: list[ChipFly] = []
@@ -254,6 +256,7 @@ class PokerScene(Scene):
         g = self.game
         stagger = 0.0
         for ev in g.pop_events():
+            self.xp.event(ev)
             k = ev.kind
             i = ev.player
             if k == "round_start":
@@ -421,6 +424,7 @@ class PokerScene(Scene):
         restart = lambda: self.app.go(PokerScene(self.app))  # noqa: E731
         if kind == "game":
             sfx.play("game_win" if HUMAN in self.game.winners() else "game_lose")
+            self.xp.game_end(HUMAN in self.game.winners())
             if self._banked is None:
                 self._banked = max(0, self.me.chips)
                 self.app.settings.chip_bank += self._banked
@@ -511,6 +515,7 @@ class PokerScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -577,6 +582,7 @@ class PokerScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     def _status(self) -> str:
@@ -689,8 +695,9 @@ class PokerScene(Scene):
         edge = theme.ACCENT if active else theme.SUCCESS if winner else theme.PANEL_EDGE
         theme.panel(surf, r, edge=edge, edge_w=3 if active or winner else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
+        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 18, profile_art.name_rgb(prof, self.clock))
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 32), color)
         cr = theme.ptext(surf, str(p.chips), (r.right - 12, r.y + 8), 20, theme.ACCENT, anchor="topright")
@@ -827,9 +834,10 @@ class PokerScene(Scene):
         box = self.seat_rect(i)
         w, h = 440, 190
         rect = pygame.Rect(max(10, min(theme.WIDTH - w - 10, box.centerx - w // 2)), box.y + 96, w, h)
-        theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
-        theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
+        profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
+        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
         label, color = self.role(i)
         self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
         theme.ptext(surf, f"{p.chips} CHIPS", (rect.right - 18, rect.y + 12), 24, theme.ACCENT, anchor="topright")
@@ -890,8 +898,9 @@ class PokerScene(Scene):
                 p = g.players[i]
                 row = pygame.Rect(panel.x + 30, 240 + k * 64, panel.w - 60, 56)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
-                theme.face(surf, (row.x + 34, row.centery), 20, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                prof = profile_art.seat_profile(self, i)
+                profile_art.avatar(surf, (row.x + 34, row.centery), 20, prof, i)
+                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
                 theme.chip(surf, (row.x + 300, row.centery + 2), 11, theme.ACCENT)
                 theme.ptext(surf, f"{p.chips} CHIPS", (row.x + 318, row.centery), 22, theme.ACCENT, anchor="midleft")
                 wins = sum(r == "won" for r in p.results)

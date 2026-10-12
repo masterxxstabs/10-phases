@@ -6,16 +6,17 @@ import math
 
 import pygame
 
-from .. import shop
+from .. import profile, shop
 from ..skins import RARITIES, RARITY_COLORS, SKINS
-from . import pack_art, sfx, theme
+from . import pack_art, profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .menus import PRIMARY, Scene, backdrop, status_bar
 from .pack_open import sample_card
 from .widgets import Button, Segmented
 
 GRID = pygame.Rect(40, 196, 1200, 476)
-TABS = ["PACKS", "CARD FRONTS", "CARD BACKS"]
+TABS = ["PACKS", "CARD FRONTS", "CARD BACKS", "PICTURES", "BACKGROUNDS"]
+PROFILE_TABS = {"PICTURES": profile.AVATARS, "BACKGROUNDS": profile.BANNERS}
 
 
 class ShopScene(Scene):
@@ -23,7 +24,7 @@ class ShopScene(Scene):
         super().__init__(app)
         self._back = back
         self.tab = tab if tab in TABS else "PACKS"
-        self.tabs = Segmented((290, 128, 700, 52), TABS, self.tab, self._set_tab, size=18)
+        self.tabs = Segmented((250, 128, 780, 52), TABS, self.tab, self._set_tab, size=14)
         self.btn_done = Button((theme.WIDTH // 2 - 130, 694, 260, 54), "DONE", self._done, size=24, **PRIMARY)
         self.flash: tuple[str, float] | None = None
         self.confirm: tuple[str, float] | None = None   # pack awaiting a second click to buy
@@ -37,6 +38,7 @@ class ShopScene(Scene):
 
     def _set_tab(self, tab: str):
         self.tab = tab
+        self.tabs.value = tab
         self.confirm = None
         self.page = 0
         self._build()
@@ -60,6 +62,11 @@ class ShopScene(Scene):
         return pygame.Rect(GRID.x + k * (w + 20), GRID.y, w, GRID.h)
 
     def all_skins(self):
+        if self.tab in PROFILE_TABS:
+            items = list(PROFILE_TABS[self.tab])
+            if self.owned_only:
+                items = [c for c in items if profile.owns(self.app.settings, c.id)]
+            return items
         kind = "face" if self.tab == "CARD FRONTS" else "back"
         out = [s for s in SKINS if s.kind == kind]
         if self.owned_only:
@@ -105,7 +112,38 @@ class ShopScene(Scene):
         self.app.go(PackOpenScene(self.app, pack.id, pulls,
                                   lambda: self.app.go(ShopScene(self.app, back=back, tab="PACKS"))))
 
+    def _profile_click(self, item):
+        s = self.app.settings
+        if profile.owns(s, item.id):
+            if profile.equipped(s, item):
+                return
+            profile.equip(s, item.id)
+            s.save()
+            sfx.play("select")
+            self.flash = (f"{item.name} is on your profile now!", 2.0)
+            return
+        if item.level:
+            sfx.play("error")
+            self.flash = (f"{item.name} unlocks at level {item.level}. Play games to earn XP!", 3.0)
+            return
+        if s.chip_bank < item.price:
+            sfx.play("error")
+            self.flash = (f"You need {item.price - s.chip_bank} more chips for {item.name}.", 3.0)
+            return
+        if not (self.confirm and self.confirm[0] == item.id):
+            self.confirm = (item.id, 3.0)
+            sfx.play("click")
+            return
+        self.confirm = None
+        profile.buy(s, item.id)
+        s.save()
+        sfx.play("coin")
+        self.flash = (f"Bought {item.name}! It's on your profile now.", 2.5)
+
     def _tile_click(self, skin):
+        if isinstance(skin, profile.Cosmetic):
+            self._profile_click(skin)
+            return
         s = self.app.settings
         if shop.owns(s, skin.id):
             if shop.equipped(s, skin):
@@ -163,7 +201,7 @@ class ShopScene(Scene):
     def draw(self, surf):
         s = self.app.settings
         backdrop(surf, self.clock)
-        theme.logo(surf, "CARD SHOP", (theme.WIDTH // 2, 62), 54, angle=4)
+        theme.logo(surf, "SHOP", (theme.WIDTH // 2, 62), 54, angle=4)
         bank = pygame.Rect(40, 24, 250, 78)
         theme.panel(surf, bank)
         for k in range(3):
@@ -185,10 +223,15 @@ class ShopScene(Scene):
             msg = "Every pack holds 3 skins. Duplicates turn back into chips."
         else:
             for k, skin in enumerate(self.skins()):
-                self._draw_skin_tile(surf, skin, self.tile_rect(k))
+                if isinstance(skin, profile.Cosmetic):
+                    self._draw_profile_tile(surf, skin, self.tile_rect(k))
+                else:
+                    self._draw_skin_tile(surf, skin, self.tile_rect(k))
             if not self.skins():
                 theme.ptext(surf, "Nothing here yet - open some packs!", GRID.center, 24, theme.TEXT_DIM, anchor="center")
             msg = "Click a skin you own to use it. Other players see your skins in multiplayer too!"
+            if self.tab in PROFILE_TABS:
+                msg = "Click to buy (click again to confirm), or to use one you own. Everyone sees your profile!"
             self.btn_owned.label = "OWNED ONLY: ON" if self.owned_only else "OWNED ONLY: OFF"
             self.btn_owned.color = "SUCCESS" if self.owned_only else "PANEL_LIGHT"
             self.btn_owned.text_color = "OUTLINE" if self.owned_only else "TEXT"
@@ -274,6 +317,42 @@ class ShopScene(Scene):
         else:
             state, color = "IN PACKS", theme.TEXT_FAINT
         theme.ptext(surf, state, (tx, r.bottom - 30), 15, color)
+
+
+    def _draw_profile_tile(self, surf, item, r: pygame.Rect):
+        s = self.app.settings
+        owned, on = profile.owns(s, item.id), profile.equipped(s, item)
+        hover = r.collidepoint(pygame.mouse.get_pos())
+        confirming = self.confirm and self.confirm[0] == item.id
+        edge = theme.ACCENT if on else theme.SUCCESS if confirming else theme.CARD_WHITE if hover else theme.PANEL_EDGE
+        theme.panel(surf, r, fill="PANEL_LIGHT" if hover else "PANEL", edge=edge, edge_w=3 if on or confirming else 2)
+        lift = -3 if hover else 0
+        if item.kind == "avatar":
+            profile_art.avatar(surf, (r.x + 52, r.y + 56 + lift), 40, {"a": item.style}, 1)
+            tx = r.x + 104
+            for n, line in enumerate(_wrap_words(item.name, 9)[:2]):
+                theme.ptext(surf, line, (tx, r.y + 22 + n * 20), 16, theme.TEXT if owned else theme.TEXT_DIM)
+        else:
+            prev = pygame.Rect(r.x + 10, r.y + 12 + lift, r.w - 20, 72)
+            profile_art.panel(surf, prev, item.style, self.clock, edge=theme.OUTLINE, edge_w=2)
+            tx = r.x + 14
+            theme.ptext(surf, item.name, (tx, r.y + 92), 15, theme.TEXT if owned else theme.TEXT_DIM)
+        if on:
+            state, color = "IN USE", theme.SUCCESS
+        elif owned:
+            state, color = "OWNED", theme.TEXT_DIM
+        elif item.level:
+            state, color = f"LEVEL {item.level}", theme.INFO
+        elif confirming:
+            state, color = "CLICK TO BUY!", theme.SUCCESS
+        else:
+            state, color = f"{item.price}", theme.ACCENT if s.chip_bank >= item.price else theme.TEXT_FAINT
+        y = r.bottom - 28
+        if not owned and not item.level and not confirming:
+            theme.chip(surf, (tx + 8, y + 9), 8, color)
+            theme.ptext(surf, state, (tx + 22, y), 16, color)
+        else:
+            theme.ptext(surf, state, (tx, y), 15, color)
 
 
 def _wrap_words(text: str, width: int) -> list[str]:

@@ -312,6 +312,7 @@ def test_random_clicking_never_crashes_any_screen(app):
     from ten_phases.ui.monopoly_scene import MonopolyScene
     from ten_phases.ui.monopoly_setup import MonopolySetupScene
     from ten_phases.ui.poker_scene import PokerScene
+    from ten_phases.ui.profile_scene import ProfileScene
     from ten_phases.ui.shop_scene import ShopScene
     from ten_phases.ui.slots_scene import SlotsScene
     from ten_phases import shop
@@ -324,7 +325,8 @@ def test_random_clicking_never_crashes_any_screen(app):
               lambda: ShopScene(app), lambda: ShopScene(app, tab="CARD FRONTS"), lambda: MenuScene(app),
               lambda: SettingsScene(app), lambda: CustomizeScene(app), lambda: HowToScene(app, "GO FISH"),
               lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng)),
-              lambda: MonopolyScene(app), lambda: MonopolySetupScene(app), lambda: HowToScene(app, "MONOPOLY")]
+              lambda: MonopolyScene(app), lambda: MonopolySetupScene(app), lambda: HowToScene(app, "MONOPOLY"),
+              lambda: ProfileScene(app), lambda: ShopScene(app, tab="PICTURES"), lambda: ShopScene(app, tab="BACKGROUNDS")]
     keys = [pygame.K_SPACE, pygame.K_RETURN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_1]
     for make in makers:
         app.settings.chip_bank = 1000

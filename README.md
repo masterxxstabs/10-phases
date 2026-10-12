@@ -211,7 +211,21 @@ The **SHOP** button under your Chip Bank opens the shop. Spend chips on card pac
 - Duplicates pay back chips: 10 / 25 / 60 / 150 by rarity.
 - Free for everyone, and never in packs: Classic, Bubble and Minimal fronts; Classic, Checker and Racing Stripes backs.
 - There are almost 300 skins: hand-made ones like Neon, Holo Foil and the Koi Pond set, plus a big generated collection with lots of foil finishes. CARD FRONTS and CARD BACKS show your collection page by page.
+- **PICTURES** and **BACKGROUNDS** sell profile pictures and hover-card backgrounds (see Profile and levels).
 - Skins work in every game and in multiplayer: other players see your fronts on the cards you play and your backs on the cards in your hand. Computer players get random skins.
+
+## Profile and levels
+
+Click your profile card on the main menu (under the SHOP button) to open **PROFILE**.
+- **Picture:** 27 profile pictures (Robot, Smiley, Cat, Dog and Frog are free). It shows on your box at every table, on hover cards and in lobbies.
+- **Background:** 22 backgrounds for your hover card (Classic, Midnight, Forest and Sunset are free). Other players see it when they hover over you, and it shows behind your row in lobbies and in Monopoly.
+- **Name colour:** 10 colours for your name at the table, plus Gold (level 10) and Rainbow (level 20).
+- **Name:** the name other players see in multiplayer.
+- More pictures (150-1200 chips) and backgrounds (150-1200 chips) are in the shop's **PICTURES** and **BACKGROUNDS** tabs. Click once to see it's for sale and again to buy it; it goes straight onto your profile.
+- **Levels:** you earn XP for what you do at the table: drawing and discarding, laying down and hitting in 10 Phases, books in Go Fish, hands in Blackjack, bets and pots in Poker, answers and wins in Cards Against Humanity, buying and building in Monopoly, and every spin in Slots. Every round you finish is worth 10 XP (30 if you went out), every game 50 XP, and winning adds 100 more. Going from level L to L+1 takes 100 + 25 x (L - 1) XP, up to level 100.
+- Level rewards: the Superstar picture (level 10), Royal background (15), Champion picture (25) and Diamond background (40).
+- Little "+XP" pops and an XP bar appear in the bottom-left as you play, and LEVEL UP! shows when you go up a level.
+- In multiplayer everyone sees each other's picture, background, name colour and level (everyone needs this version to play together). Computer players get their own.
 
 ## Slots
 
@@ -316,6 +330,8 @@ ten_phases/
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
   skins.py      every card skin and its rarity, including the generated ones
   shop.py       card packs (odds, opening, duplicates) and equipping skins
+  profile.py    profile pictures, backgrounds and name colours (what's free, for sale or a level reward)
+  levels.py     XP per action and the level curve
   names.py      computer player names
   settings.py   persisted settings
   updater.py    checks GitHub Releases, downloads, verifies and installs new versions

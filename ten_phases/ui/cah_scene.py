@@ -16,12 +16,13 @@ from ..cah.ai import CahAI
 from ..cah.engine import CHIPS_PER_POINT, CahGame, CahOptions, CahPlayer, RuleError, clean_written
 from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
-from . import cah_art, sfx, theme
+from . import cah_art, profile_art, sfx, theme
 from .admin import AdminPanel
 from .game_scene import DIFF_COLORS
 from .menus import Scene, backdrop, status_bar
 from .table_skins import TableSkins
 from .widgets import Button, TextInput
+from .xp import XpTracker
 
 HUMAN = 0
 SPLIT_Y = 222
@@ -172,6 +173,7 @@ class CahScene(Scene):
             self.ais = {i + 1: CahAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "cah")
         self.delay = SPEED_DELAYS[s.ai_speed]
         self.selected: list[int] = []          # card ids, in the order they'll be played
         self.written: dict[int, dict] = {}     # blank card id -> what you wrote
@@ -265,6 +267,7 @@ class CahScene(Scene):
     def _consume_events(self):
         g = self.game
         for ev in g.pop_events():
+            self.xp.event(ev)
             k = ev.kind
             if k == "round_start":
                 self.selected, self.pick_sub = [], None
@@ -428,6 +431,7 @@ class CahScene(Scene):
             self.app.go(CahSetupScene(self.app))
         if kind == "game":
             sfx.play("game_win" if HUMAN in self.game.winners() else "game_lose")
+            self.xp.game_end(HUMAN in self.game.winners())
             if self._banked is None:
                 self._banked = self.me.points * CHIPS_PER_POINT
                 self.app.settings.chip_bank += self._banked
@@ -508,6 +512,7 @@ class CahScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -542,6 +547,7 @@ class CahScene(Scene):
             self.editor.draw(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     def _status(self) -> str:
@@ -614,7 +620,8 @@ class CahScene(Scene):
         for k, i in enumerate(range(n)):
             p = g.players[i]
             y = SCORE_BOX.y + 32 + k * row_h
-            theme.face(surf, (SCORE_BOX.x + 24, y + row_h // 2), max(8, row_h // 2 - 2), i)
+            prof = profile_art.seat_profile(self, i)
+            profile_art.avatar(surf, (SCORE_BOX.x + 24, y + row_h // 2), max(8, row_h // 2 - 2), prof, i)
             color = theme.ACCENT if i == g.czar else theme.TEXT
             theme.ptext(surf, self.name(i)[:12], (SCORE_BOX.x + 44, y + 2), 14, color)
             if i == g.czar:
@@ -759,8 +766,9 @@ class CahScene(Scene):
                 p = g.players[i]
                 row = pygame.Rect(panel.x + 30, 240 + k * 58, panel.w - 60, 50)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
-                theme.face(surf, (row.x + 34, row.centery), 18, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                prof = profile_art.seat_profile(self, i)
+                profile_art.avatar(surf, (row.x + 34, row.centery), 18, prof, i)
+                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
                 label = p.difficulty.upper() if p.difficulty else "PLAYER"
                 color = DIFF_COLORS.get(p.difficulty, theme.CARD_WHITE)
                 theme.ptext(surf, label, (row.x + 320, row.centery), 14, color, anchor="midleft")

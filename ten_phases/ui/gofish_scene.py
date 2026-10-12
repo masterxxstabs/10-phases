@@ -16,13 +16,14 @@ from ..gofish.ai import GoFishAI
 from ..gofish.engine import VALUES, FishPlayer, GoFishGame, RuleError
 from ..names import pick_ai_names
 from ..settings import SPEED_DELAYS
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .admin import AdminPanel
 from .table_skins import TableSkins
 from .game_scene import DIFF_COLORS, FlyingCard
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
+from .xp import XpTracker
 
 HUMAN = 0
 SPLIT_Y = 222
@@ -66,6 +67,7 @@ class GoFishScene(Scene):
             self.ais = {i + 1: GoFishAI(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "fish")
         self.hint_ai = GoFishAI("Expert", random.Random(0))
         self.delay = SPEED_DELAYS[s.ai_speed]
 
@@ -185,6 +187,7 @@ class GoFishScene(Scene):
         hand = self.hand_layout()
         stagger = 0.0
         for ev in g.pop_events():
+            self.xp.event(ev)
             k = ev.kind
             if k == "ask":
                 who = self.name(ev.target).title() if ev.target != HUMAN else "you"
@@ -330,6 +333,7 @@ class GoFishScene(Scene):
         primary = dict(color="ACCENT", text_color="OUTLINE")
         if kind == "game":
             won = HUMAN in self.game.winners()
+            self.xp.game_end(won)
             sfx.play("game_win" if won else "game_lose")
             if self._banked is None:
                 self._banked = len(self.me.books) * CHIPS_PER_BOOK
@@ -415,6 +419,7 @@ class GoFishScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         if self.game.events:
             self._consume_events()
@@ -464,6 +469,7 @@ class GoFishScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     def _status(self) -> str:
@@ -501,8 +507,9 @@ class GoFishScene(Scene):
         edge = theme.ACCENT if active else (theme.SUCCESS if can_ask else theme.PANEL_EDGE)
         theme.panel(surf, r, theme.PANEL_HOVER if hover else theme.PANEL, edge, edge_w=3 if active or hover else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
+        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
         label, color = self.role(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color)
         cnt = theme.ptext(surf, str(len(p.hand)), (r.right - 12, r.y + 8), 18, anchor="topright")
@@ -569,7 +576,8 @@ class GoFishScene(Scene):
             if v in owner and slot.topleft not in animating:
                 self._book_badge(surf, (slot.centerx, slot.centery - 6), v, 34, owner[v])
                 who = owner[v]
-                theme.face(surf, (slot.right - 14, slot.bottom - 14), 11, who)
+                prof = profile_art.seat_profile(self, who)
+                profile_art.avatar(surf, (slot.right - 14, slot.bottom - 14), 11, prof, who)
                 if mine:
                     theme.rounded(surf, theme.ACCENT, slot, 8, 3)
             else:
@@ -584,8 +592,9 @@ class GoFishScene(Scene):
         active = g.current == HUMAN and not g.game_over
         theme.panel(surf, MY_BOX, edge=theme.ACCENT if active else theme.PANEL_EDGE, edge_w=3 if active else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, HUMAN)
-        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22)
+        prof = profile_art.seat_profile(self, HUMAN)
+        profile_art.avatar(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, prof, HUMAN, level=True)
+        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
         x = MY_BOX.x + 140
         theme.mini_card_icon(surf, (x, MY_BOX.y + 15))
         theme.ptext(surf, str(len(self.me.hand)), (x + 20, MY_BOX.y + 12), 18)
@@ -650,9 +659,10 @@ class GoFishScene(Scene):
         h = 170 + (28 + 20 * len(notes) if notes else 34)
         x = max(10, min(theme.WIDTH - w - 10, box.centerx - w // 2))
         rect = pygame.Rect(x, box.bottom + 8, w, h)
-        theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
-        theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
+        profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
+        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
         self._chip(surf, self.role(i)[0], (rect.x + 72, rect.y + 44), self.role(i)[1], size=12)
         theme.ptext(surf, f"{len(p.books)} BOOKS", (rect.right - 18, rect.y + 12), 26, theme.ACCENT, anchor="topright")
         theme.ptext(surf, f"{len(p.hand)} CARD{'S' if len(p.hand) != 1 else ''} IN HAND", (rect.right - 18, rect.y + 46), 14, theme.TEXT_DIM,
@@ -715,8 +725,9 @@ class GoFishScene(Scene):
                 p = g.players[i]
                 row = pygame.Rect(panel.x + 30, 240 + k * 64, panel.w - 60, 56)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
-                theme.face(surf, (row.x + 34, row.centery), 20, i)
-                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                prof = profile_art.seat_profile(self, i)
+                profile_art.avatar(surf, (row.x + 34, row.centery), 20, prof, i)
+                theme.ptext(surf, self.name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
                 theme.ptext(surf, f"{len(p.books)}", (row.x + 230, row.centery), 26, theme.ACCENT, anchor="center")
                 for n, v in enumerate(p.books):
                     self._book_badge(surf, (row.x + 290 + n * 36, row.centery + 2), v, 22, i)

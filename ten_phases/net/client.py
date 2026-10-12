@@ -6,6 +6,7 @@ import queue
 import threading
 
 from .. import __version__
+from ..profile import clean_profile
 from ..skins import clean_skin
 from .protocol import VERSION, Connection, NetError, clean_name, decode_invite, drain
 from .bj_net import RemoteBlackjackGame
@@ -19,10 +20,12 @@ from .snapshot import RemoteGame
 class ClientSession:
     """A guest's connection. Connecting runs in the background so the screen never freezes."""
 
-    def __init__(self, name: str, ip: str, port: int, key: int, skin=("classic", "classic"), token: str = ""):
+    def __init__(self, name: str, ip: str, port: int, key: int, skin=("classic", "classic"), token: str = "",
+                 profile=None):
         self.name = clean_name(name)
         self.skin = list(clean_skin(skin))
         self.token = token   # Monopoly piece we'd like
+        self.profile = clean_profile(profile)
         self.ip, self.port, self.key = ip, port, key
         self.inbox: queue.Queue = queue.Queue()
         self.conn: Connection | None = None
@@ -36,9 +39,10 @@ class ClientSession:
         threading.Thread(target=self._connect, daemon=True).start()
 
     @classmethod
-    def from_code(cls, name: str, code: str, skin=("classic", "classic"), token: str = "") -> "ClientSession":
+    def from_code(cls, name: str, code: str, skin=("classic", "classic"), token: str = "",
+                  profile=None) -> "ClientSession":
         ip, port, key = decode_invite(code)
-        return cls(name, ip, port, key, skin, token)
+        return cls(name, ip, port, key, skin, token, profile)
 
     def _connect(self):
         try:
@@ -50,7 +54,7 @@ class ClientSession:
         self.conn = conn
         self.status = "waiting"
         conn.send({"t": "hello", "v": VERSION, "app": __version__, "key": self.key, "name": self.name,
-                   "skin": self.skin, "token": self.token})
+                   "skin": self.skin, "token": self.token, "prof": self.profile})
 
     def send(self, msg: dict):
         if self.conn:

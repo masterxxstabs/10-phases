@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.12.0
+
+- New profile: pick a profile picture, a background for your hover card, and the colour of your name (click your card on the main menu)
+- Levels! Earn XP for everything you do at the table, plus bonuses for finishing rounds and games, with LEVEL UP! moments and level rewards
+- The shop now sells profile pictures and backgrounds, and everyone sees each other's profile and level in multiplayer
+- Fixes: a rare freeze in Monopoly animations
+
 ## 1.11.0
 
 - New game: Monopoly! Arrow over to it on the main menu, pick your token and how many rounds to play

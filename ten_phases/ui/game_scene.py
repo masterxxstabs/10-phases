@@ -18,12 +18,13 @@ from ..game import Game, Player, RuleError
 from ..names import pick_ai_names
 from ..phases import NUM_PHASES, PHASES, GroupType, arrange_run, describe_phase
 from ..settings import SPEED_DELAYS
-from . import sfx, theme
+from . import profile_art, sfx, theme
 from .card_art import card_with_shadow
 from .admin import AdminPanel
 from .table_skins import TableSkins
 from .menus import Scene, _wrap, backdrop, status_bar
 from .widgets import Button
+from .xp import XpTracker
 
 HUMAN = 0
 DIFF_COLORS = {"Easy": theme.SUCCESS, "Medium": theme.INFO, "Hard": theme.ORANGE, "Expert": theme.DANGER}
@@ -101,6 +102,7 @@ class GameScene(Scene):
             self.ais = {i + 1: AIPlayer(d) for i, d in enumerate(diffs)}
         self.skins = TableSkins(self)
         self.admin = AdminPanel(self)
+        self.xp = XpTracker(self, "phases")
         self.hit_queue: list[tuple[int, int]] = []
         self.hint_ai = AIPlayer("Expert", random.Random(0), advisor=True)
         self.delay = SPEED_DELAYS[s.ai_speed]
@@ -318,6 +320,7 @@ class GameScene(Scene):
                 sfx.play(name)
 
         for ev in g.pop_events():
+            self.xp.event(ev)
             k = ev.kind
             if k in ("draw", "discard", "hit"):
                 self.skins.own(ev.card, ev.player)
@@ -544,12 +547,15 @@ class GameScene(Scene):
         g = self.game
         if kind == "game":
             sfx.play("game_win" if g.winner == HUMAN else "game_lose")
+            self.xp.round_end(g.round, g.went_out == HUMAN)
+            self.xp.game_end(g.winner == HUMAN)
             if self._banked is None:
                 # Chips you finish a game with are kept in your bank (shown on the main menu).
                 self._banked = max(0, self.human.chips)
                 self.app.settings.chip_bank += self._banked
                 self.app.settings.save()
         elif kind == "round":
+            self.xp.round_end(g.round, g.went_out == HUMAN)
             sfx.play("round_win" if g.went_out == HUMAN else "round_end")
         if kind in ("round", "game") and g.went_out == HUMAN:
             sfx.play("coin")
@@ -741,6 +747,7 @@ class GameScene(Scene):
     def update(self, dt: float):
         super().update(dt)
         self.admin.update(dt)
+        self.xp.update(dt)
         self._pump_network()
         g = self.game
         if g.round != self._round_seen and not g.round_over:
@@ -792,6 +799,7 @@ class GameScene(Scene):
             self._draw_splash(surf)
         if self.overlay:
             self._draw_overlay(surf)
+        self.xp.draw(surf)
         self.admin.draw(surf)
 
     # ---------------------------------------------------------------- pieces
@@ -869,8 +877,9 @@ class GameScene(Scene):
         edge = theme.ACCENT if active else theme.DANGER if targeting else theme.PANEL_EDGE
         theme.panel(surf, r, theme.PANEL_HOVER if hover else theme.PANEL, edge, edge_w=3 if active or hover else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (r.x + 30, int(r.y + 30 + bob)), 22, i)
-        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (r.x + 30, int(r.y + 30 + bob)), 22, prof, i, level=True)
+        theme.ptext(surf, p.name, (r.x + 60, r.y + 8), 20, profile_art.name_rgb(prof, self.clock))
         label, color = self.role_chip(i)
         self._chip(surf, label, (r.x + 60, r.y + 34), color, size=10)
         self._counts(surf, p, r.right - 12, r.y + 8, i)
@@ -1027,8 +1036,9 @@ class GameScene(Scene):
         active = g.current == HUMAN and not g.round_over
         theme.panel(surf, MY_BOX, edge=theme.ACCENT if active else theme.PANEL_EDGE, edge_w=3 if active else 2)
         bob = math.sin(self.clock * 6) * 2 if active else 0
-        theme.face(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, HUMAN)
-        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22)
+        prof = profile_art.seat_profile(self, HUMAN)
+        profile_art.avatar(surf, (MY_BOX.x + 34, int(MY_BOX.y + 30 + bob)), 24, prof, HUMAN, level=True)
+        theme.ptext(surf, "YOU", (MY_BOX.x + 68, MY_BOX.y + 10), 22, profile_art.name_rgb(prof, self.clock))
         x = MY_BOX.x + 140
         theme.mini_card_icon(surf, (x, MY_BOX.y + 15))
         theme.ptext(surf, str(len(h.hand)), (x + 20, MY_BOX.y + 12), 18)
@@ -1150,8 +1160,9 @@ class GameScene(Scene):
                 y = 274 + k * 60
                 row = pygame.Rect(panel.x + 30, y, panel.w - 60, 52)
                 theme.rounded(surf, theme.PANEL_HOVER if i == HUMAN else theme.INNER, row, 10)
-                theme.face(surf, (row.x + 34, row.centery), 19, i)
-                theme.ptext(surf, self.display_name(i), (row.x + 66, row.centery), 20, anchor="midleft")
+                prof = profile_art.seat_profile(self, i)
+                profile_art.avatar(surf, (row.x + 34, row.centery), 19, prof, i)
+                theme.ptext(surf, self.display_name(i), (row.x + 66, row.centery), 20, profile_art.name_rgb(prof, self.clock), anchor="midleft")
                 if i != HUMAN and (p.difficulty or self.networked):
                     label, color = self.role_chip(i)
                     self._chip(surf, label, (row.x + 200, row.centery - 11), color, size=10)
@@ -1196,13 +1207,14 @@ class GameScene(Scene):
         h = 196 + len(reqs) * 86 + 72 + (24 + 19 * len(moves) if moves else 0)
         x = max(10, min(theme.WIDTH - w - 10, box.centerx - w // 2))
         rect = pygame.Rect(x, box.bottom + 8, w, h)
-        theme.panel(surf, rect, edge=theme.ACCENT, edge_w=3)
+        profile_art.panel(surf, rect, profile_art.seat_profile(self, i)["b"], self.clock)
         pygame.draw.polygon(surf, theme.ACCENT, [(box.centerx - 12, rect.y), (box.centerx + 12, rect.y),
                                                  (box.centerx, rect.y - 10)])
 
         # Name, role and phase
-        theme.face(surf, (rect.x + 38, rect.y + 38), 24, i)
-        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24)
+        prof = profile_art.seat_profile(self, i)
+        profile_art.avatar(surf, (rect.x + 38, rect.y + 38), 24, prof, i, level=True)
+        theme.ptext(surf, p.name, (rect.x + 72, rect.y + 12), 24, profile_art.name_rgb(prof, self.clock))
         label, color = self.role_chip(i)
         self._chip(surf, label, (rect.x + 72, rect.y + 44), color, size=12)
         if g.current == i and not g.round_over:
