@@ -11,6 +11,11 @@
     `ui/deepdig_art.py`; inspired by Motherload, our own code and art). The world is endless: `make_chunk`
     makes it CHUNK rows at a time as you dig, and saves keep the rows made so far. Tile numbers are saved, so
     only ever add ores at the end of `ORES` (the core is tile 9; v1 saves had it at 20 and are migrated).
+    The town is at negative columns (`TOWN_W`), outside the saved grid: `tile()` answers for it. Dig bots
+    (`Bot`, `_step_bot`) live in the engine and are saved with the game.
+- Display: everything draws on a 1280x800 canvas and `pygame.SCALED` fits it to the window or screen (and maps
+  the mouse). Fullscreen (`App.set_fullscreen`, F11, Alt+Enter, Settings > DISPLAY) toggles in place; never
+  call `set_mode` again while running (it can leave a broken screen).
     Single-player games go in `SINGLE_PLAYER` in `ui/menus.py`.
 
 ## How the project fits together

@@ -236,7 +236,9 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 
 **DEEP DIG** is a mining game on the main menu, inspired by the classic Flash game *Motherload* (it's our own version, written from scratch; no code or art from the original). Like Slots it's **single player**, and your game saves itself so you can carry on later.
 - **Digging:** arrows or WASD. Press down to drill down, push into a wall to drill sideways, and press up to fly (that burns fuel). Grey boulders are too hard to drill: go around them or blow them up.
-- **Town:** park in front of a building and press **E**. The fuel station fills your tank, the ore buyer pays cash for your cargo, the shop sells upgrades (drill, hull, engine, fuel tank, cargo hold, radiator, shocks, lamp and an ore scanner, 7 levels each) and items, and the repair shop fixes your hull.
+- **Town:** it sits to the left of the mine, built on solid foundations you can't dig through (rolling along the surface is free). Park in front of a building and press **E**: the **fuel station** fills your tank, the **ore buyer** pays cash for your cargo, the **garage** sells pod parts (drill, roof drill, hull, engine, fuel tank, cargo hold, radiator, shocks), the **tech lab** sells gadgets (lamp, ore scanner, armor, refinery, rescue insurance) and items, and **repairs** fixes your hull. Most upgrades have 7 levels.
+- **Digging up:** buy the **roof drill** at the garage, then hold Up against a ceiling to drill upward.
+- **Dig bots:** the **robotics** building sells up to 3 little drilling robots. They tunnel toward ore on their own (around rock, gas and lava), bring it up and sell it for you, chips and refinery bonus included. **BOT LEVEL** makes them faster, carry more and dig deeper.
 - **Danger:** gas pockets explode, lava burns, falling too far dents the hull, and deep down the heat wears the hull away unless you have a radiator. Run out of fuel or hull underground and you're towed home for a fee, and your cargo is lost.
 - **Items (keys 1-5):** repair kit, fuel can, dynamite, mega blast and teleporter.
 - **Ore:** 17 kinds, from coal and iron near the top to diamonds, relics and meteorites far down.
@@ -316,6 +318,8 @@ Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild 
 | Hints | On / Off (Hint button and progress on your Phase board) |
 | Sort hand by | Number / Color |
 | Sound FX | Off, Low, Medium, High |
+| Updates | Auto / Off |
+| Display | Window / Fullscreen (F11 or Alt+Enter switch any time). The game keeps its shape and is scaled to fit |
 
 Settings and your custom look are saved to `~/.ten_phases_settings.json`.
 

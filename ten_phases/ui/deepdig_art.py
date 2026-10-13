@@ -152,9 +152,9 @@ DRILL_METALS = [   # the drill bit's look by DRILL level: steel, then better and
 
 
 def pod(facing: int, drilling: str | None, spin: float, flame: bool, clock: float, hurt: float = 0.0,
-        size: int = 36, drill_level: int = 0) -> pygame.Surface:
+        size: int = 36, drill_level: int = 0, top_drill: bool = False) -> pygame.Surface:
     """The drill pod, seen from the side and facing left (-1) or right (1). drilling is None, "down",
-    "left" or "right". Drawn at double size and smoothed down, so the edges come out clean."""
+    "left", "right" or "up" (with the roof drill, which shows once you own it). Drawn at double size and smoothed down, so the edges come out clean."""
     Z = 2                                   # supersampling
     S = size * 2 * Z
     s = pygame.Surface((S, S), pygame.SRCALPHA)
@@ -194,10 +194,11 @@ def pod(facing: int, drilling: str | None, spin: float, flame: bool, clock: floa
         poly(steel_dark, [(sx - 3, 12), (sx + 3, 12), (sx + 2.5, 15.5), (sx - 2.5, 15.5)])
 
     # Drill: the bit on its collar. Spins and points where it digs; tucked under the pod otherwise.
-    d = drilling or "down"
+    d = drilling if drilling in ("left", "right") else "down"
+    main = drilling in ("down", "left", "right")
     metal = DRILL_METALS[max(0, min(len(DRILL_METALS) - 1, drill_level))]
     if d == "down":
-        base_a, base_b, tip = (-6.5, 15), (6.5, 15), (0, 29 if drilling else 25)
+        base_a, base_b, tip = (-6.5, 15), (6.5, 15), (0, 29 if main else 25)
         rect(ink, -7.5, 11.5, 15, 5, 2)
         rect(steel_dark, -6.5, 12, 13, 3.5, 1)
     else:   # sideways: always out the front (the pod turns to face the wall it digs)
@@ -280,6 +281,19 @@ def pod(facing: int, drilling: str | None, spin: float, flame: bool, clock: floa
         s.blit(glow, (gx - 5 * Z, gy - 5 * Z))
     rect(ink, 15.5, -6.5, 3.5, 4, 1)
     rect((255, 246, 200), 16.2, -5.8, 2.2, 2.6, 1)
+    if top_drill or drilling == "up":       # the roof drill, tucked away or digging up
+        up = drilling == "up"
+        rect(ink, -6.5, -14.5, 9, 5, 2)
+        rect(steel_dark, -6, -14, 8, 3.5, 1)
+        a, b, tip = (-6, -14), (2, -14), (-2, -29 if up else -21)
+        poly(ink, [(a[0] - 0.8, a[1] + 0.6), (b[0] + 0.8, b[1] + 0.6), (tip[0], tip[1] - 1)])
+        poly(_shade(metal, 0.62), [a, b, tip])
+        poly(metal, [a, (-2, -14), tip])
+        for k in range(3):
+            t = (k / 3 + (spin * 5 if up else 0)) % 1.0
+            p1 = (a[0] + (tip[0] - a[0]) * t, a[1] + (tip[1] - a[1]) * t)
+            p2 = (b[0] + (tip[0] - b[0]) * min(1, t + 0.15), b[1] + (tip[1] - b[1]) * min(1, t + 0.15))
+            pygame.draw.line(s, _shade(metal, 0.45), P(*p1), P(*p2), Z)
     return pygame.transform.smoothscale(s, (size * 2, size * 2))
 
 
@@ -317,37 +331,435 @@ def sky(width: int, height: int) -> pygame.Surface:
 BUILDING_STYLE = {
     "FUEL": ((230, 70, 60), "FUEL"),
     "SELL": ((70, 160, 90), "ORE BUYER"),
-    "SHOP": ((70, 120, 230), "UPGRADES"),
-    "REPAIR": ((240, 170, 40), "REPAIRS"),
+    "SHOP": ((70, 120, 230), "GARAGE"),
+    "LAB": ((150, 90, 230), "TECH LAB"),
+    "REPAIR": ((240, 150, 40), "REPAIRS"),
+    "BOTS": ((40, 180, 170), "ROBOTICS"),
 }
+BOT_COLORS = [(60, 210, 200), (255, 120, 180), (170, 230, 70)]
+BUILDING_TAGLINE = {
+    "FUEL": "Fill up before you head down",
+    "SELL": "Cash for anything you dig up",
+    "SHOP": "Pod parts: drills, engines, hulls and more",
+    "LAB": "Gadgets, gear and things that go boom",
+    "REPAIR": "Dents out, good as new",
+    "BOTS": "Little robots that dig while you dig",
+}
+GROUND = 196          # the height of a building picture; its bottom row sits on the ground
 
 
-def building(name: str, width: int) -> pygame.Surface:
-    key = ("bld", name, width)
+def _box(s, color, rect, radius=0, edge=2):
+    """A filled box with the theme's dark outline (and a drop shadow under it)."""
+    r = pygame.Rect(rect)
+    pygame.draw.rect(s, theme.OUTLINE, r.move(0, edge + 1), border_radius=radius)
+    pygame.draw.rect(s, theme.OUTLINE, r.inflate(edge * 2, edge * 2), border_radius=radius + edge)
+    pygame.draw.rect(s, color, r, border_radius=radius)
+    return r
+
+
+def _sign(s, label, color, center, size=18):
+    img = theme.pixel_surface(label, size, (255, 255, 255))
+    r = img.get_rect(center=center)
+    _box(s, color, r.inflate(18, 10), 6)
+    pygame.draw.line(s, _shade(color, 1.3), (r.x - 6, r.y - 2), (r.right + 6, r.y - 2), 2)
+    s.blit(img, r)
+    return r.inflate(18, 10)
+
+
+def _window(s, rect, lit):
+    r = _box(s, (255, 226, 140) if lit else (126, 196, 244), rect, 3)
+    pygame.draw.line(s, (255, 255, 255), (r.x + 4, r.bottom - 6), (r.x + r.w // 2, r.y + 4), 2)
+    pygame.draw.line(s, theme.OUTLINE, (r.centerx, r.y), (r.centerx, r.bottom - 1), 2)
+
+
+def building(name: str, width: int, lit: bool = False) -> pygame.Surface:
+    """Each building in town has its own look. `lit` switches the blinking lights (two cached pictures)."""
+    key = ("bld", name, width, lit)
     if key in _cache:
         return _cache[key]
     color, label = BUILDING_STYLE[name]
-    h = 150
-    s = pygame.Surface((width, h + 40), pygame.SRCALPHA)
-    wall = pygame.Rect(6, 40, width - 12, h - 2)
-    pygame.draw.rect(s, theme.OUTLINE, wall.move(0, 4), border_radius=6)
-    pygame.draw.rect(s, (236, 230, 214), wall, border_radius=6)
-    pygame.draw.polygon(s, theme.OUTLINE, [(0, 46), (width // 2, 4), (width, 46)])
-    pygame.draw.polygon(s, color, [(4, 44), (width // 2, 8), (width - 4, 44)])
-    door = pygame.Rect(width // 2 - 30, h - 34, 60, 72)
-    pygame.draw.rect(s, (60, 60, 70), door, border_radius=4)
-    pygame.draw.rect(s, (90, 90, 100), door.inflate(-8, -8), 2, border_radius=3)
-    for wx in (wall.x + 14, wall.right - 44):
-        win = pygame.Rect(wx, wall.y + 20, 30, 26)
-        pygame.draw.rect(s, (130, 200, 255), win, border_radius=3)
-        pygame.draw.rect(s, theme.OUTLINE, win, 2, border_radius=3)
-    sign = theme.pixel_surface(label, 20, (255, 255, 255))
-    sr = sign.get_rect(center=(width // 2, 66))
-    pygame.draw.rect(s, color, sr.inflate(16, 8), border_radius=6)
-    pygame.draw.rect(s, theme.OUTLINE, sr.inflate(16, 8), 2, border_radius=6)
-    s.blit(sign, sr)
+    s = pygame.Surface((width, GROUND), pygame.SRCALPHA)
+    {"FUEL": _fuel_station, "SELL": _ore_buyer, "SHOP": _garage, "LAB": _lab, "REPAIR": _repairs,
+     "BOTS": _robotics}[name](
+        s, width, color, label, lit)
     _cache[key] = s
     return s
+
+
+def _fuel_station(s, w, color, label, lit):
+    # The kiosk at the back.
+    kiosk = _box(s, (240, 236, 226), (w - 92, 92, 84, GROUND - 94), 4)
+    pygame.draw.rect(s, color, (kiosk.x, kiosk.y + 8, kiosk.w, 10))
+    _window(s, (kiosk.x + 10, kiosk.y + 30, 30, 28), lit)
+    _box(s, (70, 70, 84), (kiosk.x + 48, kiosk.y + 30, 26, kiosk.bottom - kiosk.y - 32), 2)
+    # The canopy on its pillars, with lights underneath.
+    for x in (22, w - 120):
+        _box(s, (210, 210, 220), (x, 60, 10, GROUND - 62))
+    canopy = _box(s, color, (4, 40, w - 8, 24), 4)
+    pygame.draw.rect(s, (255, 255, 255), (canopy.x, canopy.y + 14, canopy.w, 4))
+    for x in range(canopy.x + 16, canopy.right - 8, 30):
+        pygame.draw.rect(s, (255, 250, 200) if lit else (200, 200, 190), (x, canopy.bottom, 14, 3))
+    # Two pumps with glowing displays and hoses.
+    for x in (44, w - 150):
+        pump = _box(s, (230, 60, 50), (x, GROUND - 52, 24, 50), 4)
+        pygame.draw.rect(s, (30, 40, 30), (pump.x + 4, pump.y + 6, 16, 10))
+        pygame.draw.rect(s, (90, 255, 120) if lit else (60, 200, 90), (pump.x + 6, pump.y + 8, 12, 6))
+        pygame.draw.lines(s, theme.OUTLINE, False, [(pump.right, pump.y + 24), (pump.right + 8, pump.y + 30),
+                                                    (pump.right + 6, pump.y + 42)], 3)
+    # A tall price sign.
+    _box(s, (90, 90, 100), (w - 18, 6, 6, 40))
+    _sign(s, label, color, (w // 2 - 10, 20), 20)
+
+
+def _ore_buyer(s, w, color, label, lit):
+    wall = _box(s, (150, 160, 150), (8, 64, w - 16, GROUND - 66), 4)
+    for x in range(wall.x + 6, wall.right - 4, 8):           # corrugated metal
+        pygame.draw.line(s, (126, 136, 126), (x, wall.y + 2), (x, wall.bottom - 2), 2)
+    pygame.draw.polygon(s, theme.OUTLINE, [(2, 68), (w // 2, 30), (w - 2, 68)])
+    pygame.draw.polygon(s, color, [(8, 66), (w // 2, 36), (w - 8, 66)])
+    pygame.draw.line(s, _shade(color, 1.3), (w // 2, 36), (w - 8, 66), 3)
+    # The big sliding door, open, with crates of ore inside.
+    door = _box(s, (52, 46, 44), (w // 2 - 46, GROUND - 82, 92, 80), 3)
+    pygame.draw.rect(s, (200, 180, 120) if lit else (150, 130, 90), (door.x, door.y, door.w, 4))
+    for k, ore in enumerate(ORES[:4]):
+        crate = _box(s, (150, 104, 60), (door.x + 6 + k * 22, door.bottom - 22, 18, 20), 2)
+        pygame.draw.circle(s, ore.color, (crate.centerx, crate.y + 4), 5)
+    # A mine cart full of ore out front, on rails.
+    pygame.draw.line(s, (90, 80, 70), (6, GROUND - 3), (62, GROUND - 3), 3)
+    cart = _box(s, (110, 110, 124), (12, GROUND - 34, 44, 22), 3)
+    for k, c in enumerate(((255, 206, 40), (190, 240, 255), (235, 40, 70), (40, 200, 110))):
+        pygame.draw.circle(s, c, (cart.x + 8 + k * 9, cart.y - 1), 5)
+    for x in (cart.x + 8, cart.right - 8):
+        pygame.draw.circle(s, theme.OUTLINE, (x, cart.bottom + 4), 6)
+        pygame.draw.circle(s, (160, 160, 170), (x, cart.bottom + 4), 3)
+    # The sign, with a gem.
+    r = _sign(s, label, color, (w // 2 + 10, 92), 18)
+    _gem(s, (190, 240, 255), r.x - 16, r.centery, 9, random.Random(5))
+
+
+def _garage(s, w, color, label, lit):
+    wall = _box(s, (176, 84, 66), (8, 50, w - 16, GROUND - 52), 3)
+    for row, y in enumerate(range(wall.y + 4, wall.bottom, 10)):   # bricks
+        pygame.draw.line(s, (150, 70, 56), (wall.x, y), (wall.right - 1, y), 1)
+        for x in range(wall.x + (0 if row % 2 else 10), wall.right, 20):
+            pygame.draw.line(s, (150, 70, 56), (x, y), (x, y + 9), 1)
+    _box(s, (90, 90, 100), (2, 42, w - 4, 12), 3)                  # the roof edge
+    # The roll-up door, half open, with the light on inside.
+    door = pygame.Rect(w // 2 - 56, GROUND - 92, 112, 90)
+    _box(s, (40, 40, 48), door, 2)
+    inside = pygame.Rect(door.x, door.y + 44, door.w, door.h - 44)
+    pygame.draw.rect(s, (255, 230, 150) if lit else (210, 180, 110), inside)
+    for y in range(door.y + 2, door.y + 44, 6):
+        pygame.draw.line(s, (130, 140, 160), (door.x, y), (door.right - 1, y), 4)
+    pygame.draw.circle(s, (40, 40, 48), (door.centerx - 20, door.bottom - 12), 10)   # a tyre inside
+    pygame.draw.rect(s, (200, 60, 50), (door.centerx + 10, door.bottom - 24, 30, 22))   # a toolbox
+    # Stacked tyres by the wall.
+    for k in range(3):
+        pygame.draw.ellipse(s, theme.OUTLINE, (w - 46, GROUND - 14 - k * 12, 34, 14))
+        pygame.draw.ellipse(s, (60, 60, 70), (w - 44, GROUND - 13 - k * 12, 30, 11))
+    # The sign with a cog.
+    r = _sign(s, label, color, (w // 2 + 12, 76), 20)
+    cx, cy = r.x - 18, r.centery
+    for k in range(8):
+        a = k * math.pi / 4
+        pygame.draw.circle(s, (200, 200, 210), (int(cx + math.cos(a) * 11), int(cy + math.sin(a) * 11)), 4)
+    pygame.draw.circle(s, (200, 200, 210), (cx, cy), 11)
+    pygame.draw.circle(s, color, (cx, cy), 4)
+
+
+def _lab(s, w, color, label, lit):
+    base = _box(s, (230, 234, 244), (10, 96, w - 20, GROUND - 98), 6)
+    pygame.draw.rect(s, color, (base.x, base.y + 10, base.w, 6))
+    dome = pygame.Rect(w // 2 - 70, 40, 140, 112)
+    pygame.draw.ellipse(s, theme.OUTLINE, dome.inflate(6, 6))
+    pygame.draw.ellipse(s, (210, 220, 240), dome)
+    pygame.draw.ellipse(s, (240, 246, 255), dome.inflate(-40, -30).move(-12, -18))
+    pygame.draw.rect(s, (230, 234, 244), (dome.x - 4, dome.centery + 2, dome.w + 8, dome.h // 2))   # cut the dome
+    for k in range(4):                                        # a ring of glowing windows
+        _window(s, (base.x + 16 + k * ((base.w - 52) // 3), base.y + 26, 22, 20), lit and k % 2 == 0)
+    _box(s, (60, 60, 80), (w // 2 - 16, GROUND - 52, 32, 50), 4)   # sliding door
+    pygame.draw.line(s, (120, 200, 255), (w // 2, GROUND - 50), (w // 2, GROUND - 4), 2)
+    # A satellite dish and an antenna with a beacon.
+    pygame.draw.line(s, theme.OUTLINE, (w - 46, 70), (w - 40, 50), 3)
+    pygame.draw.arc(s, theme.OUTLINE, (w - 64, 26, 36, 36), 0.6, 3.6, 5)
+    pygame.draw.arc(s, (220, 224, 236), (w - 63, 27, 34, 34), 0.6, 3.6, 3)
+    pygame.draw.line(s, theme.OUTLINE, (34, 96), (34, 50), 2)
+    pygame.draw.circle(s, (255, 70, 70) if lit else (120, 40, 50), (34, 48), 5)
+    _sign(s, label, color, (w // 2, 116), 18)
+
+
+def _repairs(s, w, color, label, lit):
+    wall = _box(s, (236, 200, 140), (8, 70, w - 16, GROUND - 72), 3)
+    pygame.draw.rect(s, (60, 60, 70), (wall.x, wall.y + 12, wall.w, 8))
+    for x in range(wall.x, wall.right, 16):                   # hazard stripe
+        pygame.draw.polygon(s, color, [(x, wall.y + 12), (x + 8, wall.y + 12), (x + 4, wall.y + 20), (x - 4, wall.y + 20)])
+    _box(s, (70, 70, 80), (w // 2 - 34, GROUND - 70, 68, 68), 2)
+    pygame.draw.rect(s, (255, 220, 140) if lit else (200, 170, 110), (w // 2 - 30, GROUND - 30, 60, 28))
+    # A crane arm with a hook.
+    pygame.draw.line(s, theme.OUTLINE, (16, 70), (16, 24), 5)
+    pygame.draw.line(s, theme.OUTLINE, (16, 26), (w - 30, 26), 5)
+    pygame.draw.line(s, color, (16, 26), (w - 30, 26), 2)
+    pygame.draw.line(s, theme.OUTLINE, (w - 34, 26), (w - 34, 52), 2)
+    pygame.draw.arc(s, theme.OUTLINE, (w - 42, 48, 14, 14), 3.2, 6.2, 3)
+    # An oil barrel.
+    _box(s, (60, 110, 200), (w - 34, GROUND - 30, 20, 28), 3)
+    _sign(s, label, color, (w // 2 - 6, 50), 18)
+    # A wrench on the sign's end.
+    pygame.draw.line(s, (200, 200, 210), (w // 2 - 70, 44), (w // 2 - 56, 58), 5)
+    pygame.draw.circle(s, (200, 200, 210), (w // 2 - 72, 42), 6)
+
+
+def _robotics(s, w, color, label, lit):
+    wall = _box(s, (196, 206, 214), (8, 76, w - 16, GROUND - 78), 4)
+    for x in range(wall.x + 20, wall.right - 10, 40):        # panels
+        pygame.draw.line(s, (170, 180, 190), (x, wall.y + 2), (x, wall.bottom - 2), 2)
+    # A saw-tooth factory roof with skylights.
+    teeth = 4
+    tw = (w - 16) / teeth
+    for k in range(teeth):
+        x = 8 + k * tw
+        pygame.draw.polygon(s, theme.OUTLINE, [(x - 2, 78), (x + tw * 0.8, 44), (x + tw * 0.8, 78)])
+        pygame.draw.polygon(s, color, [(x + 1, 76), (x + tw * 0.8 - 2, 48), (x + tw * 0.8 - 2, 76)])
+        pygame.draw.line(s, (200, 240, 255) if lit else (150, 200, 220), (x + tw * 0.8 - 2, 50),
+                         (x + tw * 0.8 - 2, 76), 3)
+    # A chimney with a bit of steam.
+    _box(s, (110, 110, 124), (w - 40, 24, 14, 30), 2)
+    for k, r in enumerate((6, 8, 10)):
+        pygame.draw.circle(s, (240, 244, 250), (w - 33 + k * 6, 16 - k * 8), r)
+    # The bay door, with a conveyor coming out and a bot riding it.
+    door = _box(s, (50, 56, 70), (w // 2 - 48, GROUND - 78, 96, 76), 3)
+    pygame.draw.rect(s, (90, 255, 220) if lit else (60, 190, 170), (door.x, door.y, door.w, 4))
+    belt = pygame.Rect(10, GROUND - 16, w - 20, 10)
+    _box(s, (70, 70, 84), belt, 4)
+    for x in range(belt.x + 6, belt.right - 4, 12):
+        pygame.draw.circle(s, (130, 130, 144), (x, belt.centery), 3)
+    bot_img = bot_sprite(BOT_COLORS[0], 1, 0, 0.0, 0.0, size=34)
+    s.blit(bot_img, (w // 2 + 30, GROUND - 16 - 30))
+    _sign(s, label, color, (w // 2, 100), 18)
+
+
+def bot_sprite(color, dx: int, dy: int, spin: float, clock: float, size: int = 26, carry: int = 0,
+               glow: bool = False) -> pygame.Surface:
+    """A little dig bot: a round body on treads, one big eye, and a drill arm pointing where it's digging."""
+    Z = 3
+    S = 32 * Z
+    s = pygame.Surface((S, S), pygame.SRCALPHA)
+    ink = theme.OUTLINE
+
+    def P(x, y):
+        return (int(x * Z), int(y * Z))
+
+    def circ(c, x, y, r, w=0):
+        pygame.draw.circle(s, c, P(x, y), int(r * Z), int(w * Z) if w else 0)
+
+    def poly(c, pts):
+        pygame.draw.polygon(s, c, [P(*p) for p in pts])
+
+    if glow:
+        for r, a in ((15, 40), (11, 60)):
+            pygame.draw.circle(s, (*color, a), P(16, 16), r * Z)
+    # The drill arm, under the body when it points down (so draw it first).
+    ax, ay = (dx, dy) if (dx or dy) else (0, 1)
+    px, py = -ay, ax                                   # across the arm
+    base = (16 + ax * 7, 16 + ay * 7)
+    tip = (16 + ax * 15, 16 + ay * 15)
+    poly(ink, [(base[0] + px * 4.5, base[1] + py * 4.5), (base[0] - px * 4.5, base[1] - py * 4.5),
+               (tip[0] + ax * 1.2, tip[1] + ay * 1.2)])
+    poly((200, 206, 218), [(base[0] + px * 3.5, base[1] + py * 3.5), (base[0] - px * 3.5, base[1] - py * 3.5), tip])
+    for k in range(2):
+        f = (k / 2 + spin * 4) % 1.0
+        a = (base[0] + px * 3.5 * (1 - f) + (tip[0] - base[0]) * f, base[1] + py * 3.5 * (1 - f) + (tip[1] - base[1]) * f)
+        b = (base[0] - px * 3.5 * (1 - f) + (tip[0] - base[0]) * f, base[1] - py * 3.5 * (1 - f) + (tip[1] - base[1]) * f)
+        pygame.draw.line(s, (110, 116, 130), P(*a), P(*b), Z)
+    # Treads.
+    pygame.draw.rect(s, ink, pygame.Rect(P(6, 20), (20 * Z, 8 * Z)), border_radius=4 * Z)
+    pygame.draw.rect(s, (60, 60, 72), pygame.Rect(P(7, 21), (18 * Z, 6 * Z)), border_radius=3 * Z)
+    for k in range(3):
+        x = 9 + ((k * 6 + clock * 20) % 15)
+        circ((120, 120, 134), x, 24, 1.2)
+    # The body, its eye, and an antenna.
+    circ(ink, 16, 15, 9.5)
+    circ(color, 16, 15, 8.5)
+    circ(_shade(color, 1.3), 13.5, 11.5, 3.5)
+    eye_x = 16 + (dx or 0) * 2
+    circ(ink, eye_x, 14, 4.2)
+    circ((240, 250, 255), eye_x, 14, 3.4)
+    circ((30, 40, 60), eye_x + (dx or 0) * 1.2, 14 + (dy or 0) * 1.2, 1.8)
+    pygame.draw.line(s, ink, P(16, 6), P(18, 2), Z)
+    blink = int(clock * 3 + color[0]) % 2 == 0
+    circ((255, 230, 90) if blink else (150, 130, 60), 18, 2, 1.6)
+    for k in range(min(carry, 5)):                      # little lights: how full it is
+        circ((255, 220, 90), 11 + k * 2.5, 22.5 - 3, 0.8)
+    return pygame.transform.smoothscale(s, (size, size))
+
+
+def mine_sign(lit: bool) -> pygame.Surface:
+    """The signpost between town and the mine."""
+    key = ("minesign", lit)
+    if key in _cache:
+        return _cache[key]
+    s = pygame.Surface((150, 150), pygame.SRCALPHA)
+    _box(s, (130, 90, 56), (68, 60, 12, 90))
+    r = _sign(s, "MINE >", (180, 120, 60), (74, 40), 22)
+    pygame.draw.circle(s, (255, 230, 120) if lit else (150, 130, 80), (r.right - 4, r.y + 2), 4)
+    _cache[key] = s
+    return s
+
+
+def icon(name: str, size: int = 56) -> pygame.Surface:
+    """A picture for each upgrade and item."""
+    key = ("icon", name, size)
+    if key in _cache:
+        return _cache[key]
+    Z = 2
+    S = 64 * Z
+    s = pygame.Surface((S, S), pygame.SRCALPHA)
+    ink = theme.OUTLINE
+
+    def P(x, y):
+        return (int(x * Z), int(y * Z))
+
+    def poly(c, pts, w=0):
+        pygame.draw.polygon(s, c, [P(*p) for p in pts], w * Z if w else 0)
+
+    def circ(c, x, y, r, w=0):
+        pygame.draw.circle(s, c, P(x, y), int(r * Z), int(w * Z) if w else 0)
+
+    def box(c, x, y, w, h, r=2):
+        pygame.draw.rect(s, ink, pygame.Rect(P(x - 2, y - 2), (int((w + 4) * Z), int((h + 4) * Z))), border_radius=int((r + 2) * Z))
+        pygame.draw.rect(s, c, pygame.Rect(P(x, y), (int(w * Z), int(h * Z))), border_radius=int(r * Z))
+
+    def line(c, a, b, w=3):
+        pygame.draw.line(s, c, P(*a), P(*b), int(w * Z))
+
+    steel, gold = (190, 196, 210), (255, 206, 40)
+    if name in ("DRILL", "TOP DRILL"):
+        up = name == "TOP DRILL"
+        pts = [(18, 14), (46, 14), (32, 54)] if not up else [(18, 50), (46, 50), (32, 10)]
+        poly(ink, [(x + (2 if x > 32 else -2 if x < 32 else 0), y) for x, y in pts])
+        poly(steel, pts)
+        poly((240, 244, 250), [pts[0], ((pts[0][0] + pts[1][0]) / 2, pts[0][1]), pts[2]])
+        for k in range(3):
+            t = 0.2 + k * 0.25
+            a = (pts[0][0] + (pts[2][0] - pts[0][0]) * t, pts[0][1] + (pts[2][1] - pts[0][1]) * t)
+            b = (pts[1][0] + (pts[2][0] - pts[1][0]) * (t + 0.1), pts[1][1] + (pts[2][1] - pts[1][1]) * (t + 0.1))
+            line((110, 116, 130), a, b, 2)
+        if up:
+            poly((90, 220, 120), [(48, 30), (58, 30), (53, 20)])
+            line((90, 220, 120), (53, 28), (53, 44), 3)
+    elif name == "HULL":
+        pts = [(32, 8), (52, 16), (50, 36), (32, 56), (14, 36), (12, 16)]
+        poly(ink, [(x, y + 2) for x, y in pts])
+        poly((90, 150, 230), pts)
+        poly((140, 190, 255), [(32, 8), (52, 16), (50, 36), (32, 32)])
+        line((255, 255, 255), (24, 30), (30, 38), 3)
+        line((255, 255, 255), (30, 38), (42, 22), 3)
+    elif name == "ENGINE":
+        box((120, 124, 140), 12, 22, 34, 26, 4)
+        for k in range(3):
+            box(steel, 16 + k * 10, 12, 6, 10, 1)
+        poly((255, 140, 30), [(48, 28), (60, 35), (48, 42)])
+        poly((255, 230, 120), [(48, 31), (55, 35), (48, 39)])
+        circ((70, 72, 84), 29, 35, 6)
+    elif name in ("FUEL TANK", "FUEL CAN"):
+        box((230, 60, 50) if name == "FUEL CAN" else (240, 170, 40), 14, 16, 34, 40, 5)
+        box((90, 90, 100), 38, 8, 8, 8, 2)
+        poly((255, 255, 255), [(31, 22), (24, 36), (38, 36)])            # a fuel drop
+        circ((255, 255, 255), 31, 40, 7.5)
+    elif name == "CARGO":
+        box((176, 120, 70), 10, 18, 44, 36, 3)
+        line((130, 86, 48), (10, 30), (54, 30), 2)
+        line((130, 86, 48), (10, 42), (54, 42), 2)
+        for k, c in enumerate((gold, (190, 240, 255), (235, 40, 70))):
+            circ(ink, 20 + k * 12, 16, 6)
+            circ(c, 20 + k * 12, 15, 5)
+    elif name == "RADIATOR":
+        box((150, 200, 230), 12, 14, 40, 38, 3)
+        for x in range(18, 50, 7):
+            line((90, 140, 180), (x, 16), (x, 50), 3)
+        for k in range(3):
+            line((120, 220, 255), (20 + k * 12, 6), (24 + k * 12, 10), 2)
+    elif name == "SHOCKS":
+        for k in range(5):
+            y = 14 + k * 8
+            line(ink, (20, y), (44, y + 4), 6)
+            line(steel, (20, y), (44, y + 4), 3)
+        box((90, 90, 100), 14, 8, 36, 6, 2)
+        box((90, 90, 100), 14, 52, 36, 6, 2)
+    elif name == "LAMP":
+        for k in range(8):
+            a = k * math.pi / 4
+            line((255, 230, 120), (32 + math.cos(a) * 18, 28 + math.sin(a) * 18),
+                 (32 + math.cos(a) * 26, 28 + math.sin(a) * 26), 3)
+        circ(ink, 32, 28, 14)
+        circ((255, 240, 160), 32, 28, 12)
+        circ((255, 255, 230), 28, 24, 4)
+        box((120, 124, 140), 25, 42, 14, 12, 2)
+    elif name == "SCANNER":
+        circ(ink, 32, 32, 26)
+        circ((30, 70, 50), 32, 32, 24)
+        for r in (8, 16):
+            circ((60, 160, 100), 32, 32, r, 1)
+        poly((90, 255, 150), [(32, 32), (54, 22), (56, 32)])
+        circ(gold, 22, 40, 3)
+        circ((235, 40, 70), 42, 20, 3)
+    elif name == "ARMOR":
+        for k, (x, y) in enumerate(((10, 12), (34, 12), (10, 36), (34, 36))):
+            box((150, 156, 172) if k % 3 == 0 else (120, 126, 142), x, y, 20, 18, 3)
+            circ((220, 224, 236), x + 4, y + 4, 2)
+    elif name == "REFINERY":
+        box((120, 80, 70), 10, 20, 30, 36, 3)
+        box((255, 140, 30), 16, 36, 18, 12, 2)
+        box((90, 90, 100), 30, 6, 8, 16, 1)
+        circ(ink, 48, 40, 11)
+        circ(gold, 48, 40, 9)
+        line((200, 150, 20), (48, 34), (48, 46), 2)
+    elif name == "RESCUE":
+        circ(ink, 32, 32, 24)
+        circ((255, 255, 255), 32, 32, 22)
+        for k in range(4):
+            a = k * math.pi / 2 + math.pi / 4
+            poly((240, 70, 60), [(32 + math.cos(a - 0.4) * 22, 32 + math.sin(a - 0.4) * 22),
+                                 (32 + math.cos(a + 0.4) * 22, 32 + math.sin(a + 0.4) * 22),
+                                 (32 + math.cos(a + 0.4) * 11, 32 + math.sin(a + 0.4) * 11),
+                                 (32 + math.cos(a - 0.4) * 11, 32 + math.sin(a - 0.4) * 11)])
+        circ(ink, 32, 32, 11)
+        circ((0, 0, 0, 0), 32, 32, 9)             # (punches the hole in the middle)
+    elif name in ("DIG BOTS", "BOT LEVEL"):
+        robot = bot_sprite(BOT_COLORS[0] if name == "DIG BOTS" else BOT_COLORS[1], 0, 1, 0.0, 0.0, size=56 * Z)
+        s.blit(robot, P(4, 2))
+        if name == "BOT LEVEL":
+            poly((90, 220, 120), [(46, 22), (60, 22), (53, 8)])
+            line((90, 220, 120), (53, 20), (53, 36), 4)
+    elif name == "REPAIR KIT":
+        box((240, 240, 244), 10, 18, 44, 34, 4)
+        box((230, 60, 50), 28, 24, 8, 22, 1)
+        box((230, 60, 50), 21, 31, 22, 8, 1)
+        line(ink, (26, 18), (26, 12), 3)
+        line(ink, (38, 18), (38, 12), 3)
+        line(ink, (26, 12), (38, 12), 3)
+    elif name == "DYNAMITE":
+        for k in range(3):
+            box((220, 60, 50), 14 + k * 12, 22, 10, 32, 2)
+        box((60, 60, 70), 12, 34, 40, 6, 1)
+        line((120, 90, 60), (32, 22), (40, 10), 2)
+        circ((255, 220, 90), 41, 9, 4)
+    elif name == "MEGA BLAST":
+        circ(ink, 30, 36, 20)
+        circ((70, 50, 110), 30, 36, 18)
+        circ((150, 120, 200), 24, 30, 5)
+        box((90, 90, 100), 38, 14, 8, 8, 1)
+        line((120, 90, 60), (44, 14), (52, 6), 2)
+        for k in range(5):
+            a = k * 1.25
+            line((255, 220, 90), (54, 6), (54 + math.cos(a) * 6, 6 + math.sin(a) * 6), 2)
+    elif name == "TELEPORTER":
+        for r, c in ((24, (40, 90, 160)), (18, (80, 170, 240)), (11, (160, 230, 255)), (5, (255, 255, 255))):
+            pygame.draw.ellipse(s, c, pygame.Rect(P(32 - r, 32 - r * 0.55), (int(r * 2 * Z), int(r * 1.1 * Z))))
+        poly((160, 230, 255), [(28, 30), (36, 30), (32, 6)])
+    out = pygame.transform.smoothscale(s, (size, size))
+    _cache[key] = out
+    return out
 
 
 # --------------------------------------------------------------------------- light underground

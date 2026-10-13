@@ -31,6 +31,7 @@ class Settings:
     sfx: str = "Medium"
     player_name: str = "PLAYER"
     auto_update: bool = True
+    fullscreen: bool = False   # fill the whole screen (F11 or Alt+Enter switches)
     chip_bank: int = 0   # chips kept from finished games
     game: str = "10 PHASES"   # which game the main menu shows
     owned_items: list = field(default_factory=lambda: ["face:classic", "back:classic"])  # shop purchases

@@ -92,13 +92,17 @@ def solid(t: int) -> bool:
 
 # --------------------------------------------------------------------------- the surface
 
+# The town sits on solid foundations to the left of the mine (columns -TOWN_W to -1): you can't dig there.
+TOWN_W = 48
 BUILDINGS = {   # name: (first column, last column)
-    "FUEL": (2, 5),
-    "SELL": (10, 14),
-    "SHOP": (19, 24),
-    "REPAIR": (29, 32),
+    "BOTS": (-46, -41),
+    "FUEL": (-38, -34),
+    "SELL": (-31, -26),
+    "SHOP": (-23, -18),
+    "LAB": (-15, -10),
+    "REPAIR": (-7, -4),
 }
-START_X = 16.5
+START_X = -1.5         # where you start, and where the tow truck drops you: the town's edge, by the mine
 
 # --------------------------------------------------------------------------- upgrades and items
 
@@ -122,7 +126,27 @@ UPGRADES = {
              (0, 500, 1500, 4000, 10000, 25000, 60000, 150000)),
     "SCANNER": ((0, 3, 5, 7, 9, 12, 15, 20),                       # ore shows through the dark this many tiles away
                 (0, 1000, 3000, 8000, 20000, 50000, 120000, 300000)),
+    "TOP DRILL": ((0, 1), (0, 12000)),                             # lets you drill upward
+    "ARMOR": ((0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7),            # less damage from gas, lava and blasts
+              (0, 1500, 4000, 10000, 25000, 60000, 150000, 350000)),
+    "REFINERY": ((1.0, 1.05, 1.1, 1.15, 1.2, 1.3, 1.4, 1.5),       # ore sells for more
+                 (0, 2000, 6000, 15000, 40000, 100000, 250000, 600000)),
+    "RESCUE": ((0.0, 0.15, 0.3, 0.45, 0.55, 0.65, 0.75, 0.85),     # when towed: cargo kept, and less fee
+               (0, 1000, 3000, 8000, 20000, 50000, 120000, 300000)),
+    "DIG BOTS": ((0, 1, 2, 3), (0, 4000, 12000, 30000)),            # little robots that mine for you
+    "BOT LEVEL": ((0, 1, 2, 3, 4, 5, 6, 7),                         # how good they are (see BOT_SPEED and friends)
+                  (0, 3000, 8000, 20000, 50000, 120000, 280000, 600000)),
 }
+MAX_BOTS = 3
+BOT_SPEED = (1.0, 1.3, 1.6, 2.0, 2.5, 3.0, 3.6, 4.3)     # by BOT LEVEL
+BOT_CARRY = (3, 4, 5, 6, 8, 10, 12, 15)
+BOT_DEPTH = (40, 80, 130, 180, 240, 300, 380, 470)     # the deepest row they'll go to
+BOT_LOOK = 6                                           # how far (in tiles) a bot spots ore
+# Which building sells which upgrade: pod parts at the garage, gadgets (and items) at the lab.
+UPGRADE_SHOP = {name: "SHOP" for name in ("DRILL", "TOP DRILL", "HULL", "ENGINE", "FUEL TANK", "CARGO", "RADIATOR",
+                                          "SHOCKS")}
+UPGRADE_SHOP.update({name: "LAB" for name in ("LAMP", "SCANNER", "ARMOR", "REFINERY", "RESCUE")})
+UPGRADE_SHOP.update({"DIG BOTS": "BOTS", "BOT LEVEL": "BOTS"})
 UPGRADE_INFO = {
     "DRILL": "Drill faster through everything",
     "HULL": "More armour before you break",
@@ -133,16 +157,29 @@ UPGRADE_INFO = {
     "SHOCKS": "Land harder without denting the hull",
     "LAMP": "A brighter light in the dark",
     "SCANNER": "Spot ore through the dark",
+    "TOP DRILL": "A roof drill: hold UP against a ceiling to dig up",
+    "ARMOR": "Take less damage from gas, lava and blasts",
+    "REFINERY": "Your ore sells for more",
+    "RESCUE": "Keep cargo (and pay less) when you're towed",
+    "DIG BOTS": "Little robots that dig ore and sell it for you",
+    "BOT LEVEL": "Faster bots that carry more and dig deeper",
 }
 
 
 def upgrade_text(name: str, level: int) -> str:
     """What an upgrade level does, in a few characters."""
     v = UPGRADES[name][0][level]
-    return {"DRILL": f"x{v:g} SPEED", "HULL": f"{v} HP", "ENGINE": f"x{v:g} POWER", "FUEL TANK": f"{v} L",
-            "CARGO": f"{v} SLOTS", "RADIATOR": f"{round(v * 100)}% COOLER",
-            "SHOCKS": "NO FALL DAMAGE" if v > MAX_FALL else f"SAFE TO {v:g}",
-            "LAMP": f"{v:g} TILES", "SCANNER": f"{v} TILES" if v else "NONE"}[name]
+    text = {   # each is only worked out for its own upgrade
+        "DRILL": lambda: f"x{v:g} SPEED", "HULL": lambda: f"{v} HP", "ENGINE": lambda: f"x{v:g} POWER",
+        "FUEL TANK": lambda: f"{v} L", "CARGO": lambda: f"{v} SLOTS", "RADIATOR": lambda: f"{round(v * 100)}% COOLER",
+        "SHOCKS": lambda: "NO FALL DAMAGE" if v > MAX_FALL else f"SAFE TO {v:g}",
+        "LAMP": lambda: f"{v:g} TILES", "SCANNER": lambda: f"{v} TILES" if v else "NONE",
+        "TOP DRILL": lambda: "DIGS UP" if v else "NO ROOF DRILL", "ARMOR": lambda: f"-{round(v * 100)}% DAMAGE",
+        "REFINERY": lambda: f"+{round((v - 1) * 100)}% PRICE", "RESCUE": lambda: f"KEEP {round(v * 100)}%",
+        "DIG BOTS": lambda: (f"{v} BOT{'S' if v != 1 else ''}" if v else "NO BOTS"),
+        "BOT LEVEL": lambda: f"x{BOT_SPEED[v]:g} SPEED, {BOT_CARRY[v]} ORE",
+    }
+    return text[name]()
 ITEMS = {
     # name: (price, what it does)
     "REPAIR KIT": (1500, "Fix 35% of your hull anywhere"),
@@ -174,6 +211,36 @@ class DigError(Exception):
 
 
 @dataclass
+class Bot:
+    """A little digging robot. It moves a tile at a time: from (col, row) to (to_col, to_row) over `dur` seconds,
+    drilling the tile first if it's solid. It carries ore up to the surface, where it's sold for you."""
+    col: int
+    row: int
+    to_col: int = 0
+    to_row: int = 0
+    t: float = 0.0
+    dur: float = 0.0
+    state: str = "dig"           # dig (looking for ore), home (carrying it up), wait
+    carry: list = None
+    stuck: float = 0.0
+    seed: int = 0
+
+    def __post_init__(self):
+        self.carry = list(self.carry or [])
+        self.to_col, self.to_row = self.col, self.row
+
+    @property
+    def pos(self) -> tuple[float, float]:
+        """Where it is now (the middle of the tile it's on, sliding to the next)."""
+        k = min(1.0, self.t / self.dur) if self.dur else 1.0
+        return (self.col + (self.to_col - self.col) * k + 0.5, self.row + (self.to_row - self.row) * k + 0.5)
+
+    @property
+    def moving(self) -> bool:
+        return (self.to_col, self.to_row) != (self.col, self.row)
+
+
+@dataclass
 class Drill:
     col: int
     row: int
@@ -181,6 +248,7 @@ class Drill:
     dur: float
     start: tuple
     end: tuple
+    way: str = "down"      # down, left, right or up
 
 
 class DeepDig:
@@ -205,6 +273,8 @@ class DeepDig:
         self.events: list[tuple] = []
         self.thrusting = False
         self.clock = 0.0
+        self.bots: list[Bot] = []
+        self.bot_earned = 0        # $ the bots have made, all time
 
     # ---------------------------------------------------------------- stats
 
@@ -225,7 +295,8 @@ class DeepDig:
 
     @property
     def cargo_value(self) -> int:
-        return sum(tile_value(t) for t in self.cargo)
+        """What the hold sells for (with the refinery's bonus)."""
+        return int(sum(tile_value(t) for t in self.cargo) * self.stat("REFINERY"))
 
     @property
     def row(self) -> int:
@@ -241,7 +312,7 @@ class DeepDig:
 
     def building(self) -> str | None:
         """The building the pod is parked at (on the surface), if any."""
-        if not (self.on_surface and self.grounded and self.drill is None):
+        if not (self.on_surface and self.grounded and self.drill is None and self.x < 0):
             return None
         for name, (a, b) in BUILDINGS.items():
             if a <= self.x <= b + 1:
@@ -255,7 +326,9 @@ class DeepDig:
     # ---------------------------------------------------------------- the grid
 
     def tile(self, col: int, row: int) -> int:
-        if col < 0 or col >= W:
+        if -TOWN_W <= col < 0:               # the town: open sky, on foundations you can't dig
+            return AIR if row < 0 else CONCRETE if row < 3 else BEDROCK
+        if col < -TOWN_W or col >= W:
             return BEDROCK
         if row < 0:
             return AIR
@@ -294,6 +367,8 @@ class DeepDig:
 
     def _step(self, dt: float, left: bool, right: bool, up: bool, down: bool) -> None:
         self.clock += dt
+        for i, bot in enumerate(self.bots):
+            self._step_bot(i, bot, dt)
         self.thrusting = False
         if self.drill:
             self._step_drill(dt)
@@ -318,8 +393,13 @@ class DeepDig:
         self.vy = max(-MAX_RISE * eng, min(MAX_FALL, self.vy))
         self._move(dt)
         self._burn(burn * dt)
-        # Start drilling: down when standing on something, or sideways into a wall.
-        if self.grounded and self.fuel > 0:
+        # Start drilling: up into the ceiling (with the roof drill), down when standing on something, or
+        # sideways into a wall.
+        if up and self.fuel > 0 and self.stat("TOP DRILL") and self._hits(self.x, self.y - 0.06):
+            col, row = int(math.floor(self.x)), int(math.floor(self.y - HALF - 0.05))
+            if solid(self.tile(col, row)):
+                self._try_drill(col, row, way="up")
+        elif self.grounded and self.fuel > 0:
             if down:
                 row = int(math.floor(self.y + HALF + 0.05))
                 col = int(math.floor(self.x))
@@ -334,7 +414,7 @@ class DeepDig:
                 d = -1 if left else 1
                 edge = self.x + d * (HALF + 0.05)
                 if self._hits(self.x + d * 0.06, self.y):
-                    self._try_drill(int(math.floor(edge)), int(math.floor(self.y)), sideways=True)
+                    self._try_drill(int(math.floor(edge)), int(math.floor(self.y)), way="left" if left else "right")
         self._environment(dt)
 
     def _move(self, dt: float) -> None:
@@ -343,7 +423,7 @@ class DeepDig:
         if self._hits(nx, self.y):
             self.vx = 0.0
         else:
-            self.x = max(HALF, min(W - HALF, nx))
+            self.x = max(-TOWN_W + HALF, min(W - HALF, nx))
         ny = self.y + self.vy * dt
         was_falling = self.vy
         if self._hits(self.x, ny):
@@ -396,11 +476,13 @@ class DeepDig:
             self._tow(f"Your pod broke down ({why})")
 
     def _tow(self, why: str) -> None:
-        """Rescued: towed back up for a fee. The cargo is lost."""
-        fee = min(self.cash, 150 + self.cash // 10)
+        """Rescued: towed back up for a fee. The cargo is lost (rescue insurance keeps some, best first)."""
+        keep = self.stat("RESCUE")
+        fee = min(self.cash, int((150 + self.cash // 10) * (1 - keep)))
         self.cash -= fee
-        lost = len(self.cargo)
-        self.cargo = []
+        kept = sorted(self.cargo, key=tile_value, reverse=True)[:int(len(self.cargo) * keep)]
+        lost = len(self.cargo) - len(kept)
+        self.cargo = kept
         self.drill = None
         self.x, self.y = START_X, -HALF
         self.vx = self.vy = 0.0
@@ -417,8 +499,12 @@ class DeepDig:
             base = 0.55 + 0.05 * (t - ORE0) if is_ore(t) else 0.42
         return base * min(4.0, 1 + 1.6 * row / H) / self.stat("DRILL")
 
-    def _try_drill(self, col: int, row: int, sideways: bool = False) -> None:
+    def _try_drill(self, col: int, row: int, way: str = "down") -> None:
         t = self.tile(col, row)
+        if -TOWN_W <= col < 0 and row >= 0:                # the town's foundations
+            if not any(e[0] == "town" for e in self.events):
+                self.events.append(("town",))
+            return
         if row < 0 or not solid(t) or not 0 <= col < W:   # (the world's edge is just a wall)
             return
         if t == CORE and len(self.cargo) >= self.cargo_space:
@@ -429,11 +515,15 @@ class DeepDig:
             if not any(e[0] == "rock" for e in self.events):
                 self.events.append(("rock", col, row))
             return
-        end = (col + 0.5, row + 0.5 if not sideways else self.y)
-        if not sideways:
+        dur = self.drill_time(t, row)
+        if way == "down":
             end = (col + 0.5, row + 1 - HALF)
-        self.drill = Drill(col, row, 0.0, self.drill_time(t, row), (self.x, self.y), end)
-        self.facing = (1 if col > self.x else -1) if sideways else self.facing
+        elif way == "up":
+            end, dur = (col + 0.5, row + 0.5), dur * 1.25       # digging up is slower
+        else:
+            end = (col + 0.5, self.y)
+            self.facing = 1 if way == "right" else -1
+        self.drill = Drill(col, row, 0.0, dur, (self.x, self.y), end, way)
         self.vx = self.vy = 0.0
         self.events.append(("drill", col, row, t))
 
@@ -461,7 +551,7 @@ class DeepDig:
     def _dug(self, col: int, row: int) -> None:
         t = self.tile(col, row)
         self.set_tile(col, row, AIR)
-        depth = min(6.0, 1 + 2 * row / H)
+        depth = min(6.0, 1 + 2 * row / H) * (1 - self.stat("ARMOR"))
         if t == GAS:
             self.events.append(("boom", col, row, "gas"))
             self._hurt(18 * depth, "a gas pocket exploded")
@@ -515,13 +605,14 @@ class DeepDig:
         self.drill = None
         self.grounded = self._hits(self.x, self.y + 0.06)
         self.events.append(("boom", cx, cy, "blast"))
-        self._hurt(4 * radius, "your own blast")
+        self._hurt(4 * radius * (1 - self.stat("ARMOR")), "your own blast")
 
     # ---------------------------------------------------------------- the buildings
 
     def _need(self, name: str) -> None:
         if self.building() != name:
-            raise DigError(f"Park at the {name.title()} building first.")
+            label = {"SHOP": "Garage", "LAB": "Tech Lab", "SELL": "Ore Buyer"}.get(name, name.title())
+            raise DigError(f"Park at the {label} first.")
 
     def refuel_cost(self) -> int:
         return int(math.ceil((self.max_fuel - self.fuel) * FUEL_PRICE))
@@ -572,10 +663,7 @@ class DeepDig:
         if not self.cargo:
             raise DigError("Your cargo hold is empty. Go dig!")
         total = self.cargo_value
-        self.cash += total
-        self.earned += total
-        self.chip_progress += total
-        chips, self.chip_progress = divmod(self.chip_progress, CHIP_EVERY)
+        chips = self._bank(total)
         counts: dict[int, int] = {}
         for t in self.cargo:
             counts[t] = counts.get(t, 0) + 1
@@ -583,13 +671,123 @@ class DeepDig:
         self.events.append(("sell", total, chips, counts))
         return total, chips
 
+    def _bank(self, total: int) -> int:
+        """Money from ore: cash, the all-time total, and chips for the Chip Bank (returned)."""
+        self.cash += total
+        self.earned += total
+        self.chip_progress += total
+        chips, self.chip_progress = divmod(self.chip_progress, CHIP_EVERY)
+        return chips
+
+    # ---------------------------------------------------------------- the dig bots
+
+    def _bot_blocked(self, col: int, row: int, bot: Bot) -> bool:
+        """Tiles a bot won't go into: rock, hazards, the Heart (that's yours), the town, off the map."""
+        if not 0 <= col < W:
+            return True
+        if row < 0:
+            return bot.state != "home"
+        if row > BOT_DEPTH[self.levels["BOT LEVEL"]] and bot.state == "dig":
+            return True
+        t = self.tile(col, row)
+        if is_ore(t) and len(bot.carry) >= BOT_CARRY[self.levels["BOT LEVEL"]]:
+            return True                       # full: leave the ore for next time
+        return t in UNDRILLABLE or t in (GAS, LAVA, CORE)
+
+    def _bot_target(self, bot: Bot) -> tuple[int, int] | None:
+        """The nearest ore it can see."""
+        best, best_d = None, None
+        for row in range(max(0, bot.row - BOT_LOOK), bot.row + BOT_LOOK + 1):
+            for col in range(max(0, bot.col - BOT_LOOK), min(W - 1, bot.col + BOT_LOOK) + 1):
+                t = self.tile(col, row)
+                if t != CORE and is_ore(t) and not self._bot_blocked(col, row, bot):
+                    d = abs(col - bot.col) + abs(row - bot.row)
+                    if best_d is None or d < best_d:
+                        best, best_d = (col, row), d
+        return best
+
+    def _step_bot(self, i: int, bot: Bot, dt: float) -> None:
+        lvl = self.levels["BOT LEVEL"]
+        if bot.moving:
+            bot.t += dt
+            if bot.t < bot.dur:
+                return
+            t = self.tile(bot.to_col, bot.to_row)
+            if bot.to_row >= 0 and solid(t):        # the drilling's done
+                self.set_tile(bot.to_col, bot.to_row, AIR)
+                if is_ore(t):
+                    bot.carry.append(t)
+                    self.events.append(("bot_ore", i, t, bot.to_col, bot.to_row))
+            bot.col, bot.row, bot.t, bot.dur = bot.to_col, bot.to_row, 0.0, 0.0
+            if bot.row < 0 and bot.state == "home":
+                self._bot_sell(i, bot)
+            return
+        if bot.state == "dig" and len(bot.carry) >= BOT_CARRY[lvl]:
+            bot.state = "home"
+        rng = random.Random(bot.seed * 7919 + int(self.clock * 10) * 31 + bot.col * 3 + bot.row)
+        if bot.state == "home":
+            goal = (bot.col, -1)
+        else:
+            goal = self._bot_target(bot) or (bot.col + rng.choice((-3, 3)), bot.row + 3)
+        dx, dy = goal[0] - bot.col, goal[1] - bot.row
+        moves = []
+        if dy:
+            moves.append((0, 1 if dy > 0 else -1))
+        if dx:
+            moves.append((1 if dx > 0 else -1, 0))
+        rest = [m for m in ((0, 1), (1, 0), (-1, 0), (0, -1)) if m not in moves]
+        rng.shuffle(rest)
+        if bot.state == "home":              # going up: sideways around rock before going down again
+            rest.sort(key=lambda m: m[1])
+        for mx, my in moves + rest:
+            col, row = bot.col + mx, bot.row + my
+            if self._bot_blocked(col, row, bot):
+                continue
+            t = self.tile(col, row)
+            speed = BOT_SPEED[lvl]
+            if row >= 0 and solid(t):
+                base = 0.9 + 0.06 * (t - ORE0) if is_ore(t) else 0.8
+                dur = base * min(4.0, 1 + 1.6 * row / H) / speed
+            else:
+                dur = 0.28 / speed
+            bot.to_col, bot.to_row, bot.t, bot.dur = col, row, 0.0, dur
+            bot.stuck = 0.0
+            return
+        bot.stuck += dt                       # boxed in: after a moment it beams home
+        if bot.stuck > 3.0:
+            bot.col, bot.row = self._bot_spawn_col(i), -1
+            bot.to_col, bot.to_row = bot.col, bot.row
+            bot.stuck = 0.0
+            self._bot_sell(i, bot)
+
+    def _bot_sell(self, i: int, bot: Bot) -> None:
+        """Back at the surface: the haul is sold (refinery bonus and all), and back down it goes."""
+        if bot.carry:
+            total = int(sum(tile_value(t) for t in bot.carry) * self.stat("REFINERY"))
+            chips = self._bank(total)
+            self.bot_earned += total
+            self.events.append(("bot_sell", i, total, chips, len(bot.carry)))
+            bot.carry = []
+        bot.state = "dig"
+
+    def _bot_spawn_col(self, i: int) -> int:
+        return (5 + i * 12 + int(self.clock)) % (W - 4) + 2
+
+    def _sync_bots(self) -> None:
+        """One bot per DIG BOTS level; new ones start at the top of the mine."""
+        want = self.stat("DIG BOTS")
+        while len(self.bots) < want:
+            i = len(self.bots)
+            self.bots.append(Bot(self._bot_spawn_col(i), -1, seed=self.seed + i * 101))
+        del self.bots[want:]
+
     def upgrade_price(self, name: str) -> int | None:
         lvl = self.levels[name]
         prices = UPGRADES[name][1]
         return prices[lvl + 1] if lvl + 1 < len(prices) else None
 
     def buy_upgrade(self, name: str) -> None:
-        self._need("SHOP")
+        self._need(UPGRADE_SHOP[name])
         price = self.upgrade_price(name)
         if price is None:
             raise DigError(f"Your {name.lower()} is already the best there is.")
@@ -598,6 +796,7 @@ class DeepDig:
         self.cash -= price
         full_fuel, full_hull = self.fuel >= self.max_fuel - 0.01, self.hull >= self.max_hull - 0.01
         self.levels[name] += 1
+        self._sync_bots()
         if name == "FUEL TANK" and full_fuel:
             self.fuel = self.max_fuel
         if name == "HULL" and full_hull:
@@ -605,7 +804,7 @@ class DeepDig:
         self.events.append(("upgrade", name, self.levels[name]))
 
     def buy_item(self, name: str) -> None:
-        self._need("SHOP")
+        self._need("LAB")
         price = ITEMS[name][0]
         if self.cash < price:
             raise DigError(f"You need ${price - self.cash:,} more.")
@@ -622,17 +821,19 @@ class DeepDig:
     def to_dict(self) -> dict:
         x, y = self.drill.start if self.drill else (self.x, self.y)    # mid-drill, save where the drill began
         return {
-            "v": 2, "seed": self.seed, "grid": ["".join(chr(48 + t) for t in row) for row in self.grid],
+            "v": 3, "seed": self.seed, "grid": ["".join(chr(48 + t) for t in row) for row in self.grid],
             "x": x, "y": y, "levels": self.levels, "fuel": self.fuel, "hull": self.hull,
             "cash": self.cash, "cargo": self.cargo, "items": self.items, "deepest": self.deepest,
             "earned": self.earned, "chip_progress": self.chip_progress, "won": self.won,
+            "bots": [[b.col, b.row, b.state, b.carry] for b in self.bots], "bot_earned": self.bot_earned,
         }
 
     @classmethod
     def from_dict(cls, d: dict) -> "DeepDig":
         """Load a saved game (anything broken falls back to safe values)."""
         g = cls(seed=int(d.get("seed", 1)))
-        old = d.get("v", 1) == 1          # saved before the core moved to its own tile number
+        version = d.get("v", 1)
+        old = version == 1                # saved before the core moved to its own tile number
         rows = d.get("grid")
         if (isinstance(rows, list) and rows and len(rows) % CHUNK == 0 and len(rows) <= 2000 * CHUNK
                 and all(isinstance(r, str) and len(r) == W for r in rows)):
@@ -643,6 +844,8 @@ class DeepDig:
                 for row in range(max(0, len(grid) - 3), len(grid)):
                     grid[row] = [t if abs(c - W // 2) <= 3 and row == len(grid) - 3 else (DIRT if t == BEDROCK else t)
                                  for c, t in enumerate(grid[row])]
+            if version in (1, 2):         # the town used to stand on the mine: its foundations go
+                grid[0] = [DIRT if t == CONCRETE else t for t in grid[0]]
             if all(t in valid for r in grid for t in r):
                 g.grid = grid
         for name in UPGRADES:
@@ -655,7 +858,7 @@ class DeepDig:
         def num(key, lo, hi, default):
             v = d.get(key, default)
             return max(lo, min(hi, v)) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
-        g.x = float(num("x", HALF, W - HALF, START_X))
+        g.x = float(num("x", -TOWN_W + HALF, W - HALF, START_X))
         g.y = float(num("y", -HALF, len(g.grid) - 1, -HALF))
         g.fuel = float(num("fuel", 0, g.max_fuel, g.max_fuel))
         g.hull = float(num("hull", 1, g.max_hull, g.max_hull))
@@ -664,6 +867,21 @@ class DeepDig:
         g.earned = int(num("earned", 0, 10 ** 12, 0))
         g.chip_progress = int(num("chip_progress", 0, CHIP_EVERY - 1, 0))
         g.won = bool(d.get("won", False))
+        g.bot_earned = int(num("bot_earned", 0, 10 ** 12, 0))
+        g._sync_bots()
+        saved = d.get("bots")
+        for bot, b in zip(g.bots, saved if isinstance(saved, list) else []):
+            try:
+                col, row, state, carry = b
+                col, row = int(col), int(row)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= col < W and -1 <= row < len(g.grid) and (row < 0 or not solid(g.tile(col, row))):
+                bot.col, bot.row = bot.to_col, bot.to_row = col, row
+            bot.state = state if state in ("dig", "home") else "dig"
+            if isinstance(carry, list):
+                bot.carry = [t for t in carry if isinstance(t, int) and not isinstance(t, bool)
+                             and is_ore(t) and t != CORE][:BOT_CARRY[-1]]
         cargo = d.get("cargo", [])
         if not isinstance(cargo, list):
             cargo = []
@@ -730,10 +948,6 @@ def make_chunk(seed: int, chunk: int) -> list[list[int]]:
                 grid[cy][cx] = AIR
             cx += rng.choice((-1, 1, 0))
             cy += rng.choice((0, 0, 1, -1))
-    if chunk == 0:   # under the buildings: concrete foundations
-        for a, b in BUILDINGS.values():
-            for col in range(a, b + 1):
-                grid[0][col] = CONCRETE
     if top <= H - 5 < top + CHUNK:   # the Heart of the Earth, in a chamber on a bedrock plinth
         mid = W // 2
         for col in range(mid - 3, mid + 4):

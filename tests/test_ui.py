@@ -389,3 +389,20 @@ def test_poker_table_plays_a_whole_game_with_the_bet_picker(app):
             scene.check_or_call()
     assert picked and scene.overlay == "game"
     assert app.settings.chip_bank == max(0, scene.me.chips)
+
+
+def test_fullscreen_setting_and_keys(app):
+    """The DISPLAY setting and F11 / Alt+Enter switch fullscreen and remember it (headless: it falls back safely)."""
+    from ten_phases.ui.menus import SettingsScene
+    scene = SettingsScene(app)
+    app.go(scene)
+    display = [c for label, _, c in scene.rows if label == "DISPLAY"][0]
+    display.on_change("Fullscreen")
+    assert app.settings.fullscreen                        # remembered (and used from the next start, at least)
+    for key, mod in ((pygame.K_F11, 0), (pygame.K_RETURN, pygame.KMOD_ALT)):
+        assert app._is_fullscreen_key(pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod, unicode=""))
+    assert not app._is_fullscreen_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0, unicode=""))
+    app.set_fullscreen(False)
+    assert not app.fullscreen and not app.settings.fullscreen
+    assert app.screen.get_size() == (1280, 800)
+    scene.draw(app.screen)

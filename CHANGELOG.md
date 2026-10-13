@@ -4,6 +4,16 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.16.0
+
+- Deep Dig: the town moved to its own spot left of the mine, on solid ground you can't dig, with a signpost pointing the way
+- Every shop got its own look: a gas station with pumps, a warehouse with a mine cart, a brick garage, a domed tech lab and a repair shop with a crane, with lights that blink
+- The parts shop split in two: the Garage sells pod parts and the new Tech Lab sells gadgets and items, with picture cards for every upgrade
+- New upgrades: a roof drill that digs UP (hold Up against a ceiling), armor plating, a refinery that sells ore for more, and rescue insurance that keeps cargo when you're towed
+- Dig bots! Buy up to 3 little drilling robots at the new Robotics building. They tunnel for ore on their own and sell it for you (chips included), and BOT LEVEL makes them faster, carry more and dig deeper
+- Item pictures in the bar at the top. Old saves carry on
+- Fullscreen: a DISPLAY setting (Window or Fullscreen), and F11 or Alt+Enter switch any time. It's remembered for next time
+
 ## 1.15.0
 
 - Deep Dig goes on forever: dig past the Heart of the Earth and the ground keeps coming, with richer ore and more heat the deeper you go

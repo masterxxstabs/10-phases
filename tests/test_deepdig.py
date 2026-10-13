@@ -11,8 +11,19 @@ from ten_phases.deepdig.engine import (AIR, BEDROCK, CONCRETE, CORE, DIRT, GAS, 
                                        DigError, generate, make_chunk)
 
 
+MINE_X = 16.5      # above the middle of the mine
+
+
 def fresh(seed=3):
-    return DeepDig(seed=seed)
+    g = DeepDig(seed=seed)
+    g.x = MINE_X
+    return g
+
+
+def at(name):
+    """The middle of a building in town."""
+    a, b = dd.BUILDINGS[name]
+    return (a + b + 1) / 2
 
 
 def run(g, secs, **keys):
@@ -25,7 +36,7 @@ def check(g):
     assert 0 <= g.hull <= g.max_hull + 1e-6
     assert g.cash >= 0
     assert len(g.cargo) <= g.cargo_space
-    assert HALF - 1e-6 <= g.x <= dd.W - HALF + 1e-6
+    assert -dd.TOWN_W + HALF - 1e-6 <= g.x <= dd.W - HALF + 1e-6
     if g.drill is None:
         assert not g._hits(g.x, g.y), (g.x, g.y)
 
@@ -41,8 +52,11 @@ def test_world_generation():
     assert dd.ORE0 in shallow and dd.ORE0 + 8 not in shallow            # diamonds aren't near the top
     assert any(t >= ORE0 + 6 for t in deep)
     assert deep.count(ROCK) > shallow.count(ROCK)                      # it gets harder further down
+    assert dd.CONCRETE not in a[0]                                     # the mine's top is all topsoil
+    g = DeepDig(seed=42)
+    assert g.x < 0 and g.on_surface                                    # you start in town...
     for name, (lo, hi) in dd.BUILDINGS.items():
-        assert all(a[0][c] == dd.CONCRETE for c in range(lo, hi + 1))  # no digging under the shops
+        assert hi < 0 and all(g.tile(c, r) in dd.UNDRILLABLE for c in range(lo, hi + 1) for r in (0, 1, 5, 400))
 
 
 def test_drilling_down_collects_ore_and_burns_fuel():
@@ -134,22 +148,26 @@ def test_town_buildings():
     g.cargo = [ORE0 + 3] * 3                                     # 3 gold = $900
     with pytest.raises(DigError):
         g.sell()                                                  # not parked at the ore buyer
-    g.x = 12.5
+    g.x = at("SELL")
     run(g, 0.2)
     assert g.building() == "SELL"
     total, chips = g.sell()
     assert total == 900 and chips == 1 and g.cash == 900 and g.chip_progress == 400
-    g.x = 21.5
+    g.x = at("SHOP")
     run(g, 0.2)
+    with pytest.raises(DigError):
+        g.buy_upgrade("LAMP")                                     # gadgets are at the tech lab
+    with pytest.raises(DigError):
+        g.buy_item("DYNAMITE")
     g.buy_upgrade("DRILL")
     assert g.levels["DRILL"] == 1 and g.cash == 150
     with pytest.raises(DigError):
         g.buy_upgrade("DRILL")                                    # can't afford level 2
-    g.x, g.fuel = 3.5, 2.0
+    g.x, g.fuel = at("FUEL"), 2.0
     run(g, 0.2)
     g.refuel()
     assert g.cash < 150 and g.fuel > 2.0
-    g.x, g.hull = 30.5, 50
+    g.x, g.hull = at("REPAIR"), 50
     run(g, 0.2)
     g.repair()
     assert g.hull > 50
@@ -160,7 +178,7 @@ def test_broke_and_empty_gets_emergency_fuel_and_can_still_roll():
     g.fuel, g.cash = 0.0, 0
     run(g, 3, left=True)                     # rolling along the surface needs no fuel
     assert g.x < 10
-    g.x = 3.5
+    g.x = at("FUEL")
     run(g, 0.3)
     assert g.building() == "FUEL"
     assert g.refuel() == 0 and g.fuel > 0
@@ -221,6 +239,9 @@ def bot(g, rng, minutes=6):
                 phase = "up"
             if g.drill:
                 g.step(dt)
+                continue
+            if g.x < 0.6:                       # towed back to town: roll over to the mine
+                g.step(dt, right=True)
                 continue
             col = int(g.x)
             below = g.tile(col, int(math.floor(g.y + HALF + 0.05)))
@@ -305,7 +326,7 @@ def test_the_screen_plays(app, tmp_path, monkeypatch):
     from ten_phases import settings
     from ten_phases.ui.deepdig_scene import DeepDigScene
     monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
-    scene = DeepDigScene(app, DeepDig(seed=2))
+    scene = DeepDigScene(app, fresh(2))
     app.go(scene)
     scene.splash = None
     press = lambda k: scene.handle(pygame.event.Event(pygame.KEYDOWN, key=k, mod=0, unicode=""))  # noqa: E731
@@ -319,7 +340,7 @@ def test_the_screen_plays(app, tmp_path, monkeypatch):
     g = scene.game
     g.cargo = [ORE0 + 2] * 3
     g.drill = None
-    g.x, g.y, g.vx, g.vy = 12.5, -HALF, 0.0, 0.0
+    g.x, g.y, g.vx, g.vy = at("SELL"), -HALF, 0.0, 0.0
     scene.update(1 / 30)
     press(pygame.K_e)
     assert scene.panel == "SELL"
@@ -330,7 +351,7 @@ def test_the_screen_plays(app, tmp_path, monkeypatch):
     assert app.settings.chip_bank == bank      # $360: not a whole chip yet
     press(pygame.K_ESCAPE)
     assert scene.panel is None
-    g.x = 21.5
+    g.x = at("SHOP")
     g.cash = 5000
     scene.update(1 / 30)
     scene.use_building()
@@ -391,8 +412,9 @@ def test_new_upgrades_and_ores():
     assert len(dd.ORES) == 17 and len({o.name for o in dd.ORES}) == 17
     assert all(dd.is_ore(ORE0 + k) for k in range(17)) and dd.is_ore(CORE) and not dd.is_ore(ORE0 + 17)
     for name, (values, prices) in dd.UPGRADES.items():
-        assert len(values) == len(prices) == 8 and list(prices) == sorted(prices)
-        for lvl in range(8):
+        assert len(values) == len(prices) in (2, 4, 8) and list(prices) == sorted(prices)
+        assert name in dd.UPGRADE_SHOP and name in dd.UPGRADE_INFO
+        for lvl in range(len(values)):
             assert dd.upgrade_text(name, lvl)
     g = fresh()
     g.x, g.y = 10.5, 30.6
@@ -425,7 +447,7 @@ def test_bug_fixes():
     # Broke with $1 and an empty tank: the station's free fuel, as the button says.
     h = fresh()
     h.cash, h.fuel = 1, 0.5
-    h.x, h.y = 4.0, -HALF
+    h.x, h.y = at("FUEL"), -HALF
     assert h.emergency_fuel()
     assert h.refuel() == 0 and h.cash == 1 and h.fuel >= 0.3 * h.max_fuel
     # A slow frame is played in small steps: same place as many small ones.
@@ -479,13 +501,165 @@ def test_deep_screens_draw(app, tmp_path, monkeypatch):
         scene.update(1 / 30)
         scene.draw(app.screen)
     g.cargo = [ORE0 + k for k in range(8)]
-    g.x, g.y, g.vx, g.vy, g.drill = 12.5, -HALF, 0.0, 0.0, None
+    g.x, g.y, g.vx, g.vy, g.drill = at("SELL"), -HALF, 0.0, 0.0, None
     scene.update(1 / 30)
     scene.use_building()
     scene.draw(app.screen)                                      # 8 kinds of ore: the list fits
     scene.close_panel()
-    g.x, g.cash = 21.5, 10 ** 7
+    g.x, g.cash = at("SHOP"), 10 ** 7
     scene.update(1 / 30)
     scene.use_building()
     scene.draw(app.screen)
-    assert scene.panel == "SHOP" and len(scene.panel_buttons) == len(dd.UPGRADES) + len(dd.ITEMS) + 1
+    assert scene.panel == "SHOP" and len(scene.panel_buttons) == 8 + 1
+    scene.panel_buttons[0].on_click()                           # buy a drill upgrade
+    assert g.levels["DRILL"] == 1
+    scene.close_panel()
+    g.x = at("LAB")
+    scene.update(1 / 30)
+    scene.use_building()
+    scene.draw(app.screen)
+    assert scene.panel == "LAB" and len(scene.panel_buttons) == 5 + 5 + 1
+    scene.panel_buttons[5].on_click()                           # buy a repair kit
+    assert g.items["REPAIR KIT"] == 1
+
+
+def test_digging_up_needs_the_top_drill():
+    g = fresh()
+    g.x, g.y, g.drill = 10.5, 20.6, None
+    for c in range(9, 13):
+        g.set_tile(c, 20, AIR)
+        g.set_tile(c, 21, ROCK)
+    g.set_tile(10, 19, DIRT)
+    g.set_tile(10, 18, ORE0 + 3)
+    run(g, 1.5, up=True)
+    assert g.tile(10, 19) == DIRT                                  # no roof drill: just bumps the ceiling
+    g.levels["TOP DRILL"] = 1
+    g.drill = None
+    events = []
+    for _ in range(int(4 * 60)):
+        g.step(1 / 60, up=True)
+        events += g.pop_events()
+    assert g.tile(10, 19) == AIR and g.tile(10, 18) == AIR and ORE0 + 3 in g.cargo
+    assert any(e[0] == "drill" and e[2] == 19 for e in events) and g.row <= 18
+    check(g)
+
+
+def test_armor_refinery_and_rescue():
+    hurt = {}
+    for lvl in (0, 7):
+        g = fresh()
+        g.levels["ARMOR"] = lvl
+        g.set_tile(int(g.x), 0, GAS)
+        run(g, 1.5, down=True)
+        hurt[lvl] = g.max_hull - g.hull
+    assert 0 < hurt[7] < hurt[0] * 0.5
+    g = fresh()
+    g.levels["REFINERY"] = 7
+    g.cargo = [ORE0 + 3] * 2                                       # 2 gold: $600, +50%
+    g.x = at("SELL")
+    run(g, 0.2)
+    assert g.cargo_value == 900 and g.sell()[0] == 900
+    g = fresh()
+    g.levels["RESCUE"] = 7
+    g.cash = 1000
+    g.cargo = [ORE0] * 6 + [ORE0 + 8] * 4                          # iron, and diamonds
+    g.y, g.drill = 10.6, None
+    g._tow("test")
+    assert len(g.cargo) == 8 and g.cargo.count(ORE0 + 8) == 4     # keeps 85%, the best first
+    assert g.cash > 1000 - 250 * 0.2 and g.x < 0
+
+
+def test_no_digging_in_town_and_old_saves_lose_their_concrete():
+    g = DeepDig(seed=3)
+    g.x = at("SHOP")
+    run(g, 0.3)
+    g.pop_events()
+    run(g, 1, down=True)
+    assert g.on_surface and any(e[0] == "town" for e in g.pop_events())
+    g.items["DYNAMITE"] = 1
+    with pytest.raises(DigError):
+        g.use_item("DYNAMITE")
+    d = fresh(4).to_dict()
+    row0 = list(d["grid"][0])
+    for c in range(2, 6):                                           # v2 had the fuel station on the mine
+        row0[c] = chr(48 + CONCRETE)
+    h = DeepDig.from_dict({**d, "v": 2, "grid": ["".join(row0)] + d["grid"][1:], "x": 3.5})
+    assert CONCRETE not in h.grid[0] and h.x == 3.5
+    assert DeepDig.from_dict(h.to_dict()).to_dict()["v"] == 3
+
+
+def test_dig_bots_mine_and_sell_for_you():
+    g = fresh(8)
+    g.cash = 10 ** 6
+    with pytest.raises(DigError):
+        g.buy_upgrade("DIG BOTS")                                  # sold at robotics
+    g.x = at("BOTS")
+    run(g, 0.2)
+    for _ in range(3):
+        g.buy_upgrade("DIG BOTS")
+    assert len(g.bots) == dd.MAX_BOTS and g.upgrade_price("DIG BOTS") is None
+    g.buy_upgrade("BOT LEVEL")
+    g.x = MINE_X
+    cash, events = g.cash, []
+    heart = (dd.W // 2, dd.H - 4)
+    for _ in range(int(4 * 60 * 30)):
+        g.step(1 / 30)
+        events += g.pop_events()
+        for bot in g.bots:
+            assert 0 <= bot.col < dd.W and bot.row >= -1
+            if bot.row >= 0:
+                assert g.tile(bot.col, bot.row) == AIR                 # only ever standing in dug-out space
+            assert bot.row <= dd.BOT_DEPTH[g.levels["BOT LEVEL"]]
+            assert len(bot.carry) <= dd.BOT_CARRY[g.levels["BOT LEVEL"]]
+    sells = [e for e in events if e[0] == "bot_sell"]
+    assert len(sells) >= 6 and g.cash - cash == sum(e[2] for e in sells) == g.bot_earned
+    assert {e[1] for e in sells} == {0, 1, 2}                     # all three of them work
+    assert g.tile(*heart) == CORE
+    h = DeepDig.from_dict(g.to_dict())
+    assert [(b.col, b.row, b.state, b.carry) for b in h.bots] == [(b.col, b.row, b.state, b.carry) for b in g.bots]
+    assert h.bot_earned == g.bot_earned
+    junk = DeepDig.from_dict({**g.to_dict(), "bots": [["x"], [999, 5, "dig", [1, ORE0, CORE, True]], 7]})
+    assert len(junk.bots) == 3 and junk.bots[1].carry == [ORE0] and 0 <= junk.bots[1].col < dd.W
+
+
+def test_a_boxed_in_bot_beams_home():
+    g = fresh()
+    g.levels["DIG BOTS"] = 1
+    g._sync_bots()
+    bot = g.bots[0]
+    bot.col, bot.row = bot.to_col, bot.to_row = 10, 50
+    bot.carry = [ORE0 + 3]
+    g.set_tile(10, 50, AIR)
+    for c, r in ((9, 50), (11, 50), (10, 49), (10, 51)):
+        g.set_tile(c, r, ROCK)
+    run(g, 4)
+    assert any(e[0] == "bot_sell" for e in g.pop_events()) and g.cash >= 300
+
+
+def test_robotics_screen(app, tmp_path, monkeypatch):
+    from ten_phases import settings
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
+    g = DeepDig(seed=4)
+    g.cash = 10 ** 6
+    scene = DeepDigScene(app, g)
+    app.go(scene)
+    scene.splash = None
+    g.x = at("BOTS")
+    scene.update(1 / 30)
+    scene.use_building()
+    assert scene.panel == "BOTS"
+    scene.draw(app.screen)
+    scene.panel_buttons[0].on_click()                            # hire a bot
+    assert len(g.bots) == 1
+    scene.draw(app.screen)
+    scene.close_panel()
+    g.bots[0].carry = [ORE0 + 8] * 3                               # 3 diamonds: $150,000
+    g.bots[0].state = "home"
+    g.bots[0].row = g.bots[0].to_row = 0
+    g.set_tile(g.bots[0].col, 0, AIR)
+    bank = app.settings.chip_bank
+    for _ in range(60):
+        scene.update(1 / 30)
+        scene.draw(app.screen)
+    assert g.bot_earned == 150000 and app.settings.chip_bank == bank + 300

@@ -334,25 +334,31 @@ class SettingsScene(Scene):
             return lambda v: setattr(s, name, conv(v))
 
         row("AI LEVEL", "Mixed: one of each, easiest first",
-            Segmented((x, 146, w, 52), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
+            Segmented((x, 140, w, 48), list(DIFFICULTY_CHOICES), s.difficulty, set_attr("difficulty")))
         row("OPPONENTS", "Computer players at the table",
-            Segmented((x, 216, w, 52), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
+            Segmented((x, 202, w, 48), ["1", "2", "3", "4", "5"], str(s.opponents), set_attr("opponents", int)))
         row("AI SPEED", "Pause between computer moves",
-            Segmented((x, 286, w, 52), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
+            Segmented((x, 264, w, 48), list(SPEED_CHOICES), s.ai_speed, set_attr("ai_speed")))
         row("HINTS", "Hint button + phase progress",
-            Segmented((x, 356, w, 52), ["On", "Off"], "On" if s.hints else "Off",
+            Segmented((x, 326, w, 48), ["On", "Off"], "On" if s.hints else "Off",
                       set_attr("hints", lambda v: v == "On")))
         row("SORT HAND", "You can switch this in game",
-            Segmented((x, 426, w, 52), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
+            Segmented((x, 388, w, 48), ["Number", "Color"], s.sort_by.title(), set_attr("sort_by", str.lower)))
 
         def set_sfx(v):
             s.sfx = v
             sfx.set_volume(v)
             sfx.play("coin")
-        row("SOUND FX", "Sound effect volume", Segmented((x, 496, w, 52), list(SFX_CHOICES), s.sfx, set_sfx))
+        row("SOUND FX", "Sound effect volume", Segmented((x, 450, w, 48), list(SFX_CHOICES), s.sfx, set_sfx))
         row("UPDATES", "Download new versions on start",
-            Segmented((x, 566, w, 52), ["Auto", "Off"], "Auto" if s.auto_update else "Off",
+            Segmented((x, 512, w, 48), ["Auto", "Off"], "Auto" if s.auto_update else "Off",
                       set_attr("auto_update", lambda v: v == "Auto")))
+
+        def set_display(v):
+            self.app.set_fullscreen(v == "Fullscreen")
+        row("DISPLAY", "Window or the whole screen (F11)",
+            Segmented((x, 140 + 7 * 62, w, 48), ["Window", "Fullscreen"],
+                      "Fullscreen" if getattr(app, "fullscreen", False) else "Window", set_display))
         self.back = Button((theme.WIDTH // 2 - 130, 660, 260, 60), "DONE", self._done, size=24, **PRIMARY)
 
     def _done(self):
@@ -374,10 +380,10 @@ class SettingsScene(Scene):
     def draw(self, surf):
         backdrop(surf, self.clock)
         theme.logo(surf, "SETTINGS", (theme.WIDTH // 2, 76), 52, angle=4)
-        theme.panel(surf, (110, 128, 1060, 508), theme.PANEL)
+        theme.panel(surf, (110, 124, 1060, 520), theme.PANEL)
         for label, sub, c in self.rows:
-            theme.ptext(surf, label, (140, c.rect.y + 6), 22, theme.ACCENT)
-            theme.ptext(surf, sub, (140, c.rect.y + 36), 14, theme.TEXT_DIM)
+            theme.ptext(surf, label, (140, c.rect.y + 4), 22, theme.ACCENT)
+            theme.ptext(surf, sub, (140, c.rect.y + 32), 14, theme.TEXT_DIM)
             c.draw(surf)
         self.back.draw(surf)
         status_bar(surf, f"10 Phases v{__version__}  -  settings are saved when you press DONE.")
@@ -449,8 +455,10 @@ HOW_TO_DEEPDIG = [
     "Ore gets rarer and worth more the deeper you go: coal, iron and copper near the top, down through gold, "
     "titanium and sapphires to diamonds, ancient relics and meteorites.",
     "Watch your FUEL and HULL. Run out underground and you're towed up for a fee, and your cargo is lost.",
-    "Fly back up and park at a building, then press E: sell ore at the Ore Buyer, refuel, repair, or buy upgrades.",
-    "Upgrade your drill, hull, engine, fuel tank, cargo bay, radiator (it gets hot), shocks, lamp and ore scanner.",
+    "The town is left of the mine, on ground you can't dig. Park at a building and press E: Robotics (dig bots), "
+    "Fuel, Ore Buyer, Garage (pod parts), Tech Lab (gadgets and items) and Repairs.",
+    "Upgrades: drill, a roof drill to dig UP, hull, engine, fuel tank, cargo, radiator, shocks, lamp, scanner, "
+    "armor, refinery and rescue insurance.",
     "Watch out for gas pockets, lava, grey boulders you can't drill (blast them with dynamite) and long falls.",
     "Items, keys 1-5: repair kit, fuel can, dynamite, mega blast and a teleporter home.",
     "Every $500 of ore you sell puts 1 chip in your Chip Bank. Find the Heart of the Earth, then keep going: "

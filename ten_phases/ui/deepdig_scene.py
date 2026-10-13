@@ -12,8 +12,8 @@ import random
 import pygame
 
 from ..deepdig import engine as dd
-from ..deepdig.engine import (BUILDINGS, FEET_PER_ROW, ITEM_KEYS, ITEMS, UPGRADE_INFO, UPGRADES, W, DeepDig,
-                              DigError, tile_name, tile_value, upgrade_text)
+from ..deepdig.engine import (BUILDINGS, FEET_PER_ROW, ITEM_KEYS, ITEMS, TOWN_W, UPGRADE_INFO, UPGRADE_SHOP, UPGRADES,
+                              W, DeepDig, DigError, tile_name, tile_value, upgrade_text)
 from ..deepdig.save import delete_save, load_game, save_game
 from . import deepdig_art as art
 from . import sfx, theme
@@ -28,8 +28,9 @@ LEFT_KEYS = (pygame.K_LEFT, pygame.K_a)
 RIGHT_KEYS = (pygame.K_RIGHT, pygame.K_d)
 UP_KEYS = (pygame.K_UP, pygame.K_w)
 DOWN_KEYS = (pygame.K_DOWN, pygame.K_s)
-ITEM_ICONS = {"REPAIR KIT": (230, 90, 80), "FUEL CAN": (240, 170, 40), "DYNAMITE": (220, 60, 50),
-              "MEGA BLAST": (150, 60, 220), "TELEPORTER": (80, 200, 240)}
+SHOP_UPGRADES = [n for n in UPGRADES if UPGRADE_SHOP[n] == "SHOP"]    # the garage's pod parts
+LAB_UPGRADES = [n for n in UPGRADES if UPGRADE_SHOP[n] == "LAB"]      # the tech lab's gadgets (and the items)
+BOT_UPGRADES = [n for n in UPGRADES if UPGRADE_SHOP[n] == "BOTS"]     # robotics: hire and improve dig bots
 
 
 def money(n: int) -> str:
@@ -148,53 +149,61 @@ class DeepDigScene(Scene):
             label = f"FILL UP  {money(cost)}" if cost else "TANK FULL"
             if cost and g.emergency_fuel():
                 label = "FREE EMERGENCY FUEL"
-            b = Button((p.centerx - 170, p.bottom - 150, 340, 64), label,
+            b = Button((p.centerx - 170, p.bottom - 110, 340, 64), label,
                        lambda: self._do(g.refuel), size=22, **primary)
             b.enabled = cost > 0
             out.append(b)
         elif self.panel == "REPAIR":
             cost = g.repair_cost()
-            b = Button((p.centerx - 170, p.bottom - 150, 340, 64), f"REPAIR  {money(cost)}" if cost else "ALL FIXED",
+            b = Button((p.centerx - 170, p.bottom - 110, 340, 64), f"REPAIR  {money(cost)}" if cost else "ALL FIXED",
                        lambda: self._do(g.repair), size=22, **primary)
             b.enabled = cost > 0
             out.append(b)
         elif self.panel == "SELL":
-            b = Button((p.centerx - 170, p.bottom - 150, 340, 64),
+            b = Button((p.centerx - 170, p.bottom - 90, 340, 56),
                        f"SELL ALL  {money(g.cargo_value)}" if g.cargo else "NOTHING TO SELL",
                        lambda: self._do(g.sell), size=22, **primary)
             b.enabled = bool(g.cargo)
             out.append(b)
-        elif self.panel == "SHOP":
-            for k, name in enumerate(UPGRADES):
+        elif self.panel in ("SHOP", "LAB", "BOTS"):
+            for k, name in enumerate(self.panel_upgrades()):
                 price = g.upgrade_price(name)
-                r = self.shop_row(k)
-                b = Button((r.right - 150, r.y + 7, 140, 40), "MAXED" if price is None else money(price),
-                           lambda n=name: self._do(g.buy_upgrade, n), size=16,
-                           **(primary if price is not None and g.cash >= price else {}))
-                b.enabled = price is not None and g.cash >= price
+                r = self.card_rect(k)
+                can = price is not None and g.cash >= price
+                b = Button((r.right - 150, r.centery - 22, 136, 44), "MAXED" if price is None else money(price),
+                           lambda n=name: self._do(g.buy_upgrade, n), size=16, **(primary if can else {}))
+                b.enabled = can
                 out.append(b)
-            for k, name in enumerate(ITEM_KEYS):
-                price = ITEMS[name][0]
-                r = self.item_row(k)
-                b = Button((r.right - 130, r.y + 10, 120, 48), money(price), lambda n=name: self._do(g.buy_item, n),
-                           size=16, **(primary if g.cash >= price else {}))
-                b.enabled = g.cash >= price
-                out.append(b)
-        out.append(Button((p.right - 64, p.y + 14, 48, 44), "X", self.close_panel, size=18))
+            if self.panel == "LAB":
+                for k, name in enumerate(ITEM_KEYS):
+                    price = ITEMS[name][0]
+                    r = self.item_rect(k)
+                    b = Button((r.right - 126, r.centery - 22, 112, 44), money(price),
+                               lambda n=name: self._do(g.buy_item, n), size=15, **(primary if g.cash >= price else {}))
+                    b.enabled = g.cash >= price
+                    out.append(b)
+        out.append(Button((p.right - 62, p.y + 18, 46, 44), "X", self.close_panel, size=18))
         self.panel_buttons = out
 
     def panel_rect(self) -> pygame.Rect:
+        if self.panel in ("SHOP", "LAB", "BOTS"):
+            return pygame.Rect(60, 84, 1160, 656)
+        return pygame.Rect(340, 140, 600, 500)
+
+    def panel_upgrades(self) -> list[str]:
+        return {"SHOP": SHOP_UPGRADES, "LAB": LAB_UPGRADES, "BOTS": BOT_UPGRADES}.get(self.panel, [])
+
+    def card_rect(self, k: int) -> pygame.Rect:
+        """Where upgrade k's card goes: two columns of four at the garage, one column of five at the lab."""
+        p = self.panel_rect()
+        top = p.y + 104
         if self.panel == "SHOP":
-            return pygame.Rect(60, 90, 1160, 640)
-        return pygame.Rect(340, 150, 600, 470)
+            return pygame.Rect(p.x + 20 + (k % 2) * 568, top + (k // 2) * 134, 552, 124)
+        return pygame.Rect(p.x + 20, top + 26 + k * 104, 600, 96)
 
-    def shop_row(self, k: int) -> pygame.Rect:
+    def item_rect(self, k: int) -> pygame.Rect:
         p = self.panel_rect()
-        return pygame.Rect(p.x + 24, p.y + 88 + k * 59, 640, 54)
-
-    def item_row(self, k: int) -> pygame.Rect:
-        p = self.panel_rect()
-        return pygame.Rect(p.x + 690, p.y + 92 + k * 100, 446, 88)
+        return pygame.Rect(p.x + 636, p.y + 130 + k * 104, 504, 96)
 
     # ================================================================== overlays
 
@@ -298,7 +307,7 @@ class DeepDigScene(Scene):
         k = min(1.0, dt * 8)
         self.cam[0] += (tx - self.cam[0]) * k
         self.cam[1] += (ty - self.cam[1]) * k
-        self.cam[0] = max(0, min(W * TILE - VIEW.w, self.cam[0]))
+        self.cam[0] = max(-TOWN_W * TILE, min(W * TILE - VIEW.w, self.cam[0]))
         self.cam[1] = max(-9 * TILE, self.cam[1])          # no bottom: the ground goes on forever
         for p in self.particles:
             p[0] += p[2] * dt
@@ -333,6 +342,23 @@ class DeepDigScene(Scene):
                 self.floater("CARGO FULL!", g.x * TILE, g.y * TILE - 30, theme.DANGER)
                 self.say("Your cargo bay is full - fly up and sell, or buy a bigger bay.")
                 sfx.play("error")
+            elif k == "bot_ore":
+                _, i, t, col, row = ev
+                self.burst((col + 0.5) * TILE, (row + 0.5) * TILE, art.BOT_COLORS[i % 3], 6, 120, 3)
+            elif k == "bot_sell":
+                _, i, total, chips, n = ev
+                bot = g.bots[i] if i < len(g.bots) else None
+                if bot:
+                    bx, by = bot.pos
+                    self.floater(f"+{money(total)}", bx * TILE, by * TILE - 20, art.BOT_COLORS[i % 3])
+                if chips:
+                    self.app.settings.chip_bank += chips
+                    self.app.settings.save()
+                    self.say(f"Bot {i + 1} sold {n} ore for {money(total)}: +{chips} chip{'s' if chips != 1 else ''}!")
+                sfx.play("coin")
+            elif k == "town":
+                self.say("No digging in town: it's built on solid foundations. Roll right to the mine!", 2.4)
+                sfx.play("deselect")
             elif k == "rock":
                 self.say("Too hard to drill! Go around it, or blow it up with dynamite (key 3).", 2.2)
                 sfx.play("deselect")
@@ -408,6 +434,7 @@ class DeepDigScene(Scene):
         self._draw_world(surf)
         self._draw_effects(surf)
         self._draw_dark(surf)
+        self._draw_bots(surf)
         surf.set_clip(clip)
         self._draw_hud(surf)
         self._draw_prompt(surf)
@@ -425,8 +452,10 @@ class DeepDigScene(Scene):
         b = g.building()
         if b:
             return f"Press E to use the {art.BUILDING_STYLE[b][1].title()}."
+        if g.on_surface and g.x < 0:
+            return "This is the town. Roll right to the mine (rolling on the surface is free)."
         if g.on_surface:
-            return "Drill down to dig. Fly back up to sell ore at the Ore Buyer."
+            return "Drill down to dig. Fly back up and roll left to town to sell your ore."
         if len(g.cargo) >= g.cargo_space:
             return "Cargo bay full! Fly up and sell it."
         if g.fuel < g.max_fuel * 0.2:
@@ -443,12 +472,16 @@ class DeepDigScene(Scene):
             h = int(-cam_y) + 4
             sky = art.sky(VIEW.w, max(h, VIEW.h))            # one picture, showing its bottom h pixels
             surf.blit(sky, (VIEW.x, VIEW.y), (0, sky.get_height() - h, VIEW.w, h))
+            lit = int(self.clock * 2) % 2 == 0
             for name, (a, b) in BUILDINGS.items():
                 width = (b - a + 1) * TILE
-                img = art.building(name, width)
+                img = art.building(name, width, lit)
                 x, y = self.to_screen(a * TILE, 0)
                 surf.blit(img, (x, y - img.get_height()))
-        c0 = max(0, int(cam_x // TILE))
+            sign = art.mine_sign(lit)
+            x, y = self.to_screen(-1.85 * TILE, 0)
+            surf.blit(sign, (x - sign.get_width() // 2, y - sign.get_height()))
+        c0 = max(-TOWN_W, int(cam_x // TILE))
         c1 = min(W - 1, int((cam_x + VIEW.w) // TILE) + 1)
         r0 = max(0, int(cam_y // TILE))
         r1 = int((cam_y + VIEW.h) // TILE) + 1
@@ -456,7 +489,7 @@ class DeepDigScene(Scene):
         for row in range(r0, r1 + 1):
             line = g.grid[row]
             for col in range(c0, c1 + 1):
-                t = line[col]
+                t = line[col] if col >= 0 else g.tile(col, row)
                 x, y = self.to_screen(col * TILE, row * TILE)
                 img = art.tile_surface(t, row, col)
                 if img is None:
@@ -469,12 +502,26 @@ class DeepDigScene(Scene):
         d = g.drill
         drilling = None
         if d:
-            drilling = "down" if d.row > g.y + 0.2 else ("right" if d.col > g.x else "left")
+            drilling = d.way
         img = art.pod(g.facing, drilling, self.spin, g.thrusting, self.clock, self.hurt_flash,
-                      drill_level=g.levels["DRILL"])
+                      drill_level=g.levels["DRILL"], top_drill=bool(g.stat("TOP DRILL")))
         x, y = self.to_screen(g.x * TILE, g.y * TILE)
         jitter = (random.uniform(-1.5, 1.5) if d else 0)
         surf.blit(img, img.get_rect(center=(x + jitter, y - 2)))
+
+    def _draw_bots(self, surf):
+        g = self.game
+        for i, bot in enumerate(g.bots):
+            bx, by = bot.pos
+            x, y = self.to_screen(bx * TILE, by * TILE)
+            if not VIEW.inflate(60, 60).collidepoint(x, y):
+                continue
+            dx, dy = bot.to_col - bot.col, bot.to_row - bot.row
+            digging = bot.moving and bot.to_row >= 0 and dd.solid(g.tile(bot.to_col, bot.to_row))
+            img = art.bot_sprite(art.BOT_COLORS[i % 3], dx, dy, self.clock if digging else 0.0, self.clock,
+                                 30, len(bot.carry), glow=g.y > 2)
+            jitter = random.uniform(-1, 1) if digging else 0
+            surf.blit(img, img.get_rect(center=(x + jitter, y - 2)))
 
     def _draw_effects(self, surf):
         for x, y, _, _, ttl, color, size in self.particles:
@@ -568,7 +615,7 @@ class DeepDigScene(Scene):
         for n, name in enumerate(ITEM_KEYS):
             box = pygame.Rect(x + n * 52, 12, 46, 40)
             theme.rounded(surf, theme.INNER, box, 8)
-            pygame.draw.circle(surf, ITEM_ICONS[name], (box.centerx, box.centery - 2), 10)
+            surf.blit(art.icon(name, 30), (box.centerx - 15, box.centery - 16))
             theme.ptext(surf, str(n + 1), (box.x + 4, box.y + 2), 10, theme.TEXT_DIM)
             count = g.items[name]
             theme.ptext(surf, str(count), (box.right - 4, box.bottom - 2), 13,
@@ -596,67 +643,144 @@ class DeepDigScene(Scene):
         p = self.panel_rect()
         color, label = art.BUILDING_STYLE[self.panel]
         theme.panel(surf, p, edge=color, edge_w=4)
-        theme.ptext(surf, label, (p.x + 28, p.y + 22), 32, color)
-        theme.ptext(surf, f"CASH {money(g.cash)}", (p.right - 90, p.y + 30), 20, theme.SUCCESS, anchor="topright")
+        self._draw_header(surf, p, color, label)
         if self.panel == "FUEL":
             self._big_bar(surf, p, "FUEL", g.fuel, g.max_fuel, (240, 170, 40))
-            theme.ptext(surf, f"${dd.FUEL_PRICE} per litre", (p.centerx, p.y + 250), 18, theme.TEXT_DIM, anchor="center")
+            theme.ptext(surf, f"${dd.FUEL_PRICE} per litre", (p.centerx, p.y + 300), 18, theme.TEXT_DIM, anchor="center")
         elif self.panel == "REPAIR":
             self._big_bar(surf, p, "HULL", g.hull, g.max_hull, (90, 200, 110))
-            theme.ptext(surf, f"${dd.REPAIR_PRICE} per point", (p.centerx, p.y + 250), 18, theme.TEXT_DIM, anchor="center")
+            theme.ptext(surf, f"${dd.REPAIR_PRICE} per point", (p.centerx, p.y + 300), 18, theme.TEXT_DIM,
+                        anchor="center")
         elif self.panel == "SELL":
-            counts: dict[int, int] = {}
-            for t in g.cargo:
-                counts[t] = counts.get(t, 0) + 1
-            y = p.y + 92
-            if not counts:
-                theme.ptext(surf, "Your hold is empty. Go dig!", (p.centerx, p.y + 200), 20, theme.TEXT_DIM,
-                            anchor="center")
-            kinds = sorted(counts.items(), key=lambda kv: -tile_value(kv[0]))
-            shown = kinds if len(kinds) <= 6 else kinds[:5]
-            for t, n in shown:
-                img = art.tile_surface(t, 100, 3)
-                surf.blit(img, (p.x + 40, y))
-                theme.ptext(surf, f"{tile_name(t)} x{n}", (p.x + 96, y + 8), 20)
-                theme.ptext(surf, money(tile_value(t) * n), (p.right - 40, y + 8), 20, theme.SUCCESS, anchor="topright")
-                y += 46
-            if len(shown) < len(kinds):              # the rest on one line
-                rest = kinds[len(shown):]
-                theme.ptext(surf, f"+ {sum(n for _, n in rest)} MORE ({len(rest)} KINDS)", (p.x + 96, y + 8), 18,
-                            theme.TEXT_DIM)
-                theme.ptext(surf, money(sum(tile_value(t) * n for t, n in rest)), (p.right - 40, y + 8), 18,
-                            theme.SUCCESS, anchor="topright")
-            theme.ptext(surf, f"Every {money(dd.CHIP_EVERY)} sold = 1 chip for your Chip Bank", (p.centerx, p.bottom - 60),
-                        14, theme.TEXT_DIM, anchor="center")
-        elif self.panel == "SHOP":
-            theme.ptext(surf, "UPGRADES", (p.x + 28, p.y + 66), 16, theme.TEXT_DIM)
-            theme.ptext(surf, "ITEMS (keys 1-5 to use)", (p.x + 690, p.y + 66), 16, theme.TEXT_DIM)
-            for k, name in enumerate(UPGRADES):
-                r = self.shop_row(k)
-                theme.rounded(surf, theme.INNER, r, 10)
-                theme.ptext(surf, name, (r.x + 14, r.y + 7), 17)
-                theme.text(surf, UPGRADE_INFO[name], (r.x + 14, r.y + 31), 12, theme.TEXT_DIM, bold=False)
-                lvl = g.levels[name]
-                for n in range(1, len(UPGRADES[name][0])):
-                    pip = pygame.Rect(r.x + 214 + n * 20, r.y + 9, 15, 15)
-                    pygame.draw.rect(surf, theme.ACCENT if n <= lvl else theme.PANEL, pip, border_radius=4)
-                    pygame.draw.rect(surf, theme.OUTLINE, pip, 2, border_radius=4)
-                now = upgrade_text(name, lvl)
-                nxt = upgrade_text(name, lvl + 1) if lvl + 1 < len(UPGRADES[name][0]) else None
-                theme.ptext(surf, f"{now}  >  {nxt}" if nxt else f"{now}  (BEST)", (r.x + 234, r.y + 32), 12,
-                            theme.TEXT if nxt else theme.TEXT_DIM)
-            for k, name in enumerate(ITEM_KEYS):
-                r = self.item_row(k)
-                theme.rounded(surf, theme.INNER, r, 10)
-                pygame.draw.circle(surf, ITEM_ICONS[name], (r.x + 32, r.centery), 16)
-                theme.ptext(surf, f"{name}  ({k + 1})", (r.x + 60, r.y + 12), 18)
-                theme.text(surf, ITEMS[name][1], (r.x + 60, r.y + 42), 13, theme.TEXT_DIM, bold=False)
-                theme.ptext(surf, f"YOU HAVE {g.items[name]}", (r.x + 60, r.y + 62), 12, theme.TEXT_FAINT)
+            self._draw_sell(surf, p)
+        elif self.panel in ("SHOP", "LAB", "BOTS"):
+            if self.panel == "BOTS":
+                theme.ptext(surf, "UPGRADES", (p.x + 24, p.y + 104), 16, theme.TEXT_DIM)
+                self._draw_roster(surf, p)
+            if self.panel == "LAB":
+                theme.ptext(surf, "GADGETS", (p.x + 24, p.y + 104), 16, theme.TEXT_DIM)
+                theme.ptext(surf, "ITEMS  (keys 1-5 use them)", (p.x + 640, p.y + 104), 16, theme.TEXT_DIM)
+            for k, name in enumerate(self.panel_upgrades()):
+                self._draw_upgrade_card(surf, self.card_rect(k), name, color)
+            if self.panel == "LAB":
+                for k, name in enumerate(ITEM_KEYS):
+                    r = self.item_rect(k)
+                    theme.rounded(surf, theme.INNER, r, 12)
+                    theme.rounded(surf, theme.PANEL, pygame.Rect(r.x + 10, r.y + 10, 76, 76), 10)
+                    surf.blit(art.icon(name, 64), (r.x + 16, r.y + 16))
+                    theme.ptext(surf, f"{name}  ({k + 1})", (r.x + 100, r.y + 12), 17)
+                    theme.text(surf, ITEMS[name][1], (r.x + 100, r.y + 40), 12, theme.TEXT_DIM, bold=False)
+                    theme.ptext(surf, f"YOU HAVE {g.items[name]}", (r.x + 100, r.y + 66), 12,
+                                theme.TEXT if g.items[name] else theme.TEXT_FAINT)
         for b in self.panel_buttons:
             b.draw(surf)
 
+    def _draw_roster(self, surf, p):
+        """Robotics: a row for each bot slot (what it's up to and what it carries)."""
+        g = self.game
+        theme.ptext(surf, f"YOUR BOTS  (up to {dd.MAX_BOTS})", (p.x + 640, p.y + 104), 16, theme.TEXT_DIM)
+        lvl = g.levels["BOT LEVEL"]
+        for k in range(dd.MAX_BOTS):
+            r = self.item_rect(k)
+            theme.rounded(surf, theme.INNER, r, 12)
+            pad = pygame.Rect(r.x + 10, r.y + 10, 76, 76)
+            theme.rounded(surf, theme.PANEL, pad, 10)
+            if k < len(g.bots):
+                bot = g.bots[k]
+                surf.blit(art.bot_sprite(art.BOT_COLORS[k], 1, 0, self.clock, self.clock, 64, len(bot.carry)),
+                          (pad.x + 6, pad.y + 6))
+                theme.ptext(surf, f"BOT {k + 1}", (r.x + 100, r.y + 12), 18, art.BOT_COLORS[k])
+                where = "at the surface" if bot.row < 0 else f"{int(bot.row * FEET_PER_ROW):,} ft down"
+                doing = "bringing ore up" if bot.state == "home" else "digging for ore"
+                theme.text(surf, f"{doing.capitalize()}, {where}", (r.x + 100, r.y + 42), 13, theme.TEXT_DIM,
+                           bold=False)
+                theme.ptext(surf, f"CARRYING {len(bot.carry)}/{dd.BOT_CARRY[lvl]}", (r.x + 100, r.y + 66), 12,
+                            theme.TEXT)
+            else:
+                theme.ptext(surf, "?", pad.center, 30, theme.TEXT_FAINT, anchor="center")
+                theme.ptext(surf, "EMPTY SLOT", (r.x + 100, r.y + 14), 18, theme.TEXT_FAINT)
+                theme.text(surf, "Buy DIG BOTS to put a robot to work.", (r.x + 100, r.y + 44), 13, theme.TEXT_FAINT,
+                           bold=False)
+        y = self.item_rect(dd.MAX_BOTS).y + 16
+        theme.ptext(surf, f"YOUR BOTS HAVE EARNED {money(g.bot_earned)}", (p.x + 640, y), 18, theme.SUCCESS)
+        theme.text(surf, f"They dig to {int(dd.BOT_DEPTH[lvl] * FEET_PER_ROW):,} ft, steer around rock, gas and lava,",
+                   (p.x + 640, y + 34), 13, theme.TEXT_DIM, bold=False)
+        theme.text(surf, "and sell what they find when they get back up.", (p.x + 640, y + 54), 13,
+                   theme.TEXT_DIM, bold=False)
+
+    def _draw_header(self, surf, p, color, label):
+        """The shop's banner: its colour with a stripe pattern, its little building, name and tagline."""
+        band = pygame.Rect(p.x + 8, p.y + 8, p.w - 16, 84)
+        theme.rounded(surf, color, band, 12)
+        stripes = pygame.Surface(band.size, pygame.SRCALPHA)
+        for x in range(-band.h, band.w, 28):
+            pygame.draw.polygon(stripes, (255, 255, 255, 26), [(x, band.h), (x + 14, band.h), (x + 14 + band.h, 0),
+                                                               (x + band.h, 0)])
+        surf.blit(stripes, band)
+        a, b = BUILDINGS[self.panel]
+        pic = art.building(self.panel, (b - a + 1) * TILE, int(self.clock * 2) % 2 == 0)
+        k = 76 / pic.get_height()
+        thumb = pygame.transform.smoothscale(pic, (int(pic.get_width() * k), 76))
+        surf.blit(thumb, (band.x + 10, band.bottom - 78))
+        x = band.x + thumb.get_width() + 26
+        theme.logo(surf, label, (x + theme.pixel_surface(label, 34).get_width() // 2 + 8, band.y + 30), 34, angle=0)
+        theme.ptext(surf, art.BUILDING_TAGLINE[self.panel], (x, band.y + 56), 15, (255, 255, 255))
+        theme.ptext(surf, f"CASH {money(self.game.cash)}", (band.right - 74, band.y + 32), 20, (255, 255, 255),
+                    anchor="topright")
+
+    def _draw_upgrade_card(self, surf, r, name, color):
+        g = self.game
+        lvl = g.levels[name]
+        top = len(UPGRADES[name][0]) - 1
+        theme.rounded(surf, theme.INNER, r, 12)
+        pad = pygame.Rect(r.x + 10, r.centery - 38, 76, 76)
+        theme.rounded(surf, color if lvl else theme.PANEL, pad, 10)
+        surf.blit(art.icon(name, 64), (pad.x + 6, pad.y + 6))
+        x = pad.right + 14
+        tall = r.h > 110
+        theme.ptext(surf, name, (x, r.y + (14 if tall else 8)), 18)
+        theme.text(surf, UPGRADE_INFO[name], (x, r.y + (42 if tall else 32)), 12, theme.TEXT_DIM, bold=False)
+        y = r.y + (66 if tall else 54)
+        for n in range(1, top + 1):
+            pip = pygame.Rect(x + (n - 1) * 20, y, 15, 15)
+            pygame.draw.rect(surf, theme.ACCENT if n <= lvl else theme.PANEL, pip, border_radius=4)
+            pygame.draw.rect(surf, theme.OUTLINE, pip, 2, border_radius=4)
+        now = upgrade_text(name, lvl)
+        nxt = upgrade_text(name, lvl + 1) if lvl < top else None
+        theme.ptext(surf, f"{now}  >  {nxt}" if nxt else f"{now}  (BEST)", (x, y + 22), 12,
+                    theme.TEXT if nxt else theme.TEXT_DIM)
+
+    def _draw_sell(self, surf, p):
+        g = self.game
+        counts: dict[int, int] = {}
+        for t in g.cargo:
+            counts[t] = counts.get(t, 0) + 1
+        y = p.y + 112
+        if not counts:
+            theme.ptext(surf, "Your hold is empty. Go dig!", (p.centerx, p.y + 230), 20, theme.TEXT_DIM, anchor="center")
+        kinds = sorted(counts.items(), key=lambda kv: -tile_value(kv[0]))
+        shown = kinds if len(kinds) <= 5 else kinds[:4]
+        for t, n in shown:
+            img = art.tile_surface(t, 100, 3)
+            surf.blit(img, (p.x + 40, y))
+            theme.ptext(surf, f"{tile_name(t)} x{n}", (p.x + 96, y + 8), 20)
+            theme.ptext(surf, money(tile_value(t) * n), (p.right - 40, y + 8), 20, theme.SUCCESS, anchor="topright")
+            y += 46
+        if len(shown) < len(kinds):              # the rest on one line
+            rest = kinds[len(shown):]
+            theme.ptext(surf, f"+ {sum(n for _, n in rest)} MORE ({len(rest)} KINDS)", (p.x + 96, y + 8), 18,
+                        theme.TEXT_DIM)
+            theme.ptext(surf, money(sum(tile_value(t) * n for t, n in rest)), (p.right - 40, y + 8), 18,
+                        theme.SUCCESS, anchor="topright")
+        bonus = g.stat("REFINERY")
+        if bonus > 1 and counts:
+            theme.ptext(surf, f"REFINERY BONUS +{round((bonus - 1) * 100)}%", (p.centerx, p.bottom - 100), 16,
+                        theme.ACCENT, anchor="center")
+        theme.ptext(surf, f"Every {money(dd.CHIP_EVERY)} sold = 1 chip for your Chip Bank", (p.centerx, p.bottom - 18),
+                    14, theme.TEXT_DIM, anchor="center")
+
     def _big_bar(self, surf, p, label, value, maximum, color):
-        bar = pygame.Rect(p.x + 60, p.y + 150, p.w - 120, 40)
+        bar = pygame.Rect(p.x + 60, p.y + 200, p.w - 120, 40)
         theme.ptext(surf, f"{label} {value:.0f} / {maximum:.0f}", (bar.x, bar.y - 32), 20)
         pygame.draw.rect(surf, theme.OUTLINE, bar.move(0, 3), border_radius=14)
         pygame.draw.rect(surf, theme.INNER, bar, border_radius=14)

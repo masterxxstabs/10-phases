@@ -22,10 +22,10 @@ class App:
             pygame.display.set_icon(app_icon(64))
         except pygame.error:
             pass
-        flags = pygame.SCALED | pygame.RESIZABLE
-        self.screen = pygame.display.set_mode((theme.WIDTH, theme.HEIGHT), flags)
-        self.clock = pygame.time.Clock()
         self.settings = Settings.load()
+        self.fullscreen = False
+        self._open_window(self.settings.fullscreen)
+        self.clock = pygame.time.Clock()
         sfx.init(self.settings.sfx)
         theme.apply(self.settings)
         self.updater = updater.Updater()
@@ -34,6 +34,34 @@ class App:
         self.running = True
         from .menus import MenuScene
         self.scene = MenuScene(self)
+
+    def _open_window(self, fullscreen: bool) -> None:
+        """The game draws on a 1280x800 canvas; SCALED has the graphics card stretch it to fit the window (or
+        the whole screen), keeping its shape, and maps the mouse back onto the canvas for us."""
+        flags = pygame.SCALED | (pygame.FULLSCREEN if fullscreen else pygame.RESIZABLE)
+        try:
+            self.screen = pygame.display.set_mode((theme.WIDTH, theme.HEIGHT), flags)
+            self.fullscreen = fullscreen
+        except pygame.error:            # no fullscreen here (e.g. a headless test): a window it is
+            self.screen = pygame.display.set_mode((theme.WIDTH, theme.HEIGHT), pygame.SCALED | pygame.RESIZABLE)
+            self.fullscreen = False
+
+    def set_fullscreen(self, on: bool) -> None:
+        """Switch between a window and the whole screen, and remember it for next time."""
+        if on != self.fullscreen:
+            try:
+                pygame.display.toggle_fullscreen()
+                self.fullscreen = on
+            except pygame.error:
+                # Can't switch while running here (making the window again can break it): it applies next start.
+                pass
+            self.screen = pygame.display.get_surface() or self.screen
+        self.settings.fullscreen = on
+        self.settings.save()
+
+    def _is_fullscreen_key(self, event) -> bool:
+        return event.type == pygame.KEYDOWN and (
+            event.key == pygame.K_F11 or (event.key == pygame.K_RETURN and event.mod & pygame.KMOD_ALT))
 
     def go(self, scene) -> None:
         self._flush_xp()
@@ -75,6 +103,8 @@ class App:
                 if event.type == pygame.QUIT:
                     self._flush_xp()
                     self.running = False
+                elif self._is_fullscreen_key(event):
+                    self.set_fullscreen(not self.fullscreen)
                 else:
                     self.scene.handle(event)
             self.scene.update(dt)
