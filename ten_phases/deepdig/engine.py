@@ -95,8 +95,9 @@ def solid(t: int) -> bool:
 # --------------------------------------------------------------------------- the surface
 
 # The town sits on solid foundations to the left of the mine (columns -TOWN_W to -1): you can't dig there.
-TOWN_W = 56
+TOWN_W = 63
 BUILDINGS = {   # name: (first column, last column)
+    "BANK": (-61, -56),
     "OIL": (-54, -49),
     "BOTS": (-46, -41),
     "FUEL": (-38, -34),
@@ -106,6 +107,7 @@ BUILDINGS = {   # name: (first column, last column)
     "REPAIR": (-7, -4),
 }
 OIL_PRICE = 20000      # buying into the oil business (the Oil Field mini-game)
+BANK_RATE = 2500       # $ per Chip Bank chip at the bank
 START_X = -1.5         # where you start, and where the tow truck drops you: the town's edge, by the mine
 
 # --------------------------------------------------------------------------- upgrades and items
@@ -618,7 +620,7 @@ class DeepDig:
     def _need(self, name: str) -> None:
         if self.building() != name:
             label = {"SHOP": "Garage", "LAB": "Tech Lab", "SELL": "Ore Buyer", "OIL": "Oil Refinery",
-                     "BOTS": "Robotics"}.get(name, name.title())
+                     "BOTS": "Robotics", "BANK": "Bank"}.get(name, name.title())
             raise DigError(f"Park at the {label} first.")
 
     def refuel_cost(self) -> int:
@@ -677,6 +679,24 @@ class DeepDig:
         self.cargo = []
         self.events.append(("sell", total, chips, counts))
         return total, chips
+
+    # ---------------------------------------------------------------- the bank
+
+    def can_exchange(self) -> int:
+        """How many chips your cash would buy at the bank."""
+        return self.cash // BANK_RATE
+
+    def exchange(self, chips: int) -> int:
+        """Turn cash into Chip Bank chips. Returns the chips (the screen puts them in the Chip Bank)."""
+        self._need("BANK")
+        if not isinstance(chips, int) or chips <= 0:
+            raise DigError("Pick how many chips you want.")
+        cost = chips * BANK_RATE
+        if self.cash < cost:
+            raise DigError(f"You need ${cost - self.cash:,} more for {chips} chip{'s' if chips != 1 else ''}.")
+        self.cash -= cost
+        self.events.append(("exchange", chips, cost))
+        return chips
 
     # ---------------------------------------------------------------- the oil business
 

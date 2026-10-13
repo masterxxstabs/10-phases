@@ -336,6 +336,7 @@ BUILDING_STYLE = {
     "REPAIR": ((240, 150, 40), "REPAIRS"),
     "BOTS": ((40, 180, 170), "ROBOTICS"),
     "OIL": ((70, 70, 84), "OIL REFINERY"),
+    "BANK": ((200, 150, 40), "BANK"),
 }
 BOT_COLORS = [(60, 210, 200), (255, 120, 180), (170, 230, 70)]
 BUILDING_TAGLINE = {
@@ -346,6 +347,7 @@ BUILDING_TAGLINE = {
     "REPAIR": "Dents out, good as new",
     "BOTS": "Little robots that dig while you dig",
     "OIL": "Your oil business: drill, pump, haul and sell",
+    "BANK": "Turn your cash into chips for the Card Shop",
 }
 GROUND = 196          # the height of a building picture; its bottom row sits on the ground
 
@@ -382,7 +384,7 @@ def building(name: str, width: int, lit: bool = False) -> pygame.Surface:
     color, label = BUILDING_STYLE[name]
     s = pygame.Surface((width, GROUND), pygame.SRCALPHA)
     {"FUEL": _fuel_station, "SELL": _ore_buyer, "SHOP": _garage, "LAB": _lab, "REPAIR": _repairs,
-     "BOTS": _robotics, "OIL": _refinery}[name](
+     "BOTS": _robotics, "OIL": _refinery, "BANK": _bank}[name](
         s, width, color, label, lit)
     _cache[key] = s
     return s
@@ -619,6 +621,36 @@ def _refinery(s, w, color, label, lit):
     pygame.draw.polygon(s, (30, 30, 36), [(w // 2 - 88, GROUND - 103), (w // 2 - 72, GROUND - 103),
                                           (w // 2 - 80, GROUND - 118)])
     pygame.draw.circle(s, (120, 120, 140), (w // 2 - 83, GROUND - 103), 2)
+
+
+def _bank(s, w, color, label, lit):
+    """A stone bank: steps, columns, a pediment with a chip in it, and the vault door glinting inside."""
+    stone, dark = (232, 226, 210), (196, 188, 168)
+    for k in range(3):                                         # the steps
+        _box(s, dark if k % 2 else stone, (8 + k * 6, GROUND - 12 - k * 8, w - 16 - k * 12, 8), 1)
+    body = _box(s, stone, (22, 84, w - 44, GROUND - 84 - 34), 2)
+    pygame.draw.polygon(s, theme.OUTLINE, [(6, 88), (w // 2, 30), (w - 6, 88)])  # the pediment
+    pygame.draw.polygon(s, stone, [(12, 85), (w // 2, 36), (w - 12, 85)])
+    pygame.draw.line(s, dark, (12, 85), (w - 12, 85), 4)
+    pygame.draw.circle(s, theme.OUTLINE, (w // 2, 66), 13)    # a chip in the pediment
+    pygame.draw.circle(s, color, (w // 2, 66), 11)
+    for k in range(6):
+        a = k * math.pi / 3
+        pygame.draw.line(s, (255, 255, 255), (w // 2 + math.cos(a) * 7, 66 + math.sin(a) * 7),
+                         (w // 2 + math.cos(a) * 11, 66 + math.sin(a) * 11), 2)
+    pygame.draw.circle(s, (255, 236, 150), (w // 2, 66), 5)
+    for x in range(body.x + 6, body.right - 10, (body.w - 12) // 4):  # columns
+        _box(s, (246, 242, 232), (x, body.y + 4, 12, body.h - 4), 1)
+        pygame.draw.line(s, dark, (x + 4, body.y + 8), (x + 4, body.bottom - 4), 1)
+    door = pygame.Rect(w // 2 - 22, GROUND - 92, 44, 58)       # the vault door, round and shiny
+    pygame.draw.rect(s, (40, 36, 30), door)
+    pygame.draw.circle(s, theme.OUTLINE, door.center, 18)
+    pygame.draw.circle(s, (230, 220, 190) if lit else (180, 170, 150), door.center, 16)
+    for k in range(4):
+        a = k * math.pi / 2 + 0.4
+        pygame.draw.line(s, (90, 84, 70), door.center, (door.centerx + math.cos(a) * 12, door.centery + math.sin(a) * 12),
+                         3)
+    _sign(s, label, color, (w // 2, 104), 18)
 
 
 def oil_buyer(label: str, color, width: int, lit: bool) -> pygame.Surface:

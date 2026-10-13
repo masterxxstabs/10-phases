@@ -663,3 +663,36 @@ def test_robotics_screen(app, tmp_path, monkeypatch):
         scene.update(1 / 30)
         scene.draw(app.screen)
     assert g.bot_earned == 150000 and app.settings.chip_bank == bank + 300
+
+
+def test_the_bank_turns_cash_into_chips(app, tmp_path, monkeypatch):
+    from ten_phases import settings
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
+    g = DeepDig(seed=2)
+    g.cash = dd.BANK_RATE * 12 + 100
+    with pytest.raises(DigError):
+        g.exchange(1)                                             # not at the bank
+    scene = DeepDigScene(app, g)
+    app.go(scene)
+    scene.splash = None
+    g.x = at("BANK")
+    scene.update(1 / 30)
+    scene.use_building()
+    assert scene.panel == "BANK"
+    scene.draw(app.screen)
+    bank = app.settings.chip_bank
+    buttons = {b.label: b for b in scene.panel_buttons}
+    assert not buttons["100 CHIPS"].enabled and buttons["10 CHIPS"].enabled
+    buttons["10 CHIPS"].on_click()
+    assert app.settings.chip_bank == bank + 10 and g.cash == dd.BANK_RATE * 2 + 100
+    buttons = {b.label: b for b in scene.panel_buttons}
+    buttons["ALL: 2"].on_click()
+    assert app.settings.chip_bank == bank + 12 and g.cash == 100
+    with pytest.raises(DigError):
+        g.exchange(1)                                             # broke
+    for bad in (0, -5, 1.5):
+        with pytest.raises(DigError):
+            g.exchange(bad)
+    scene.draw(app.screen)
+    assert all(not b.enabled for b in scene.panel_buttons if b.label != "X")

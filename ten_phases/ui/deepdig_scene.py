@@ -173,6 +173,15 @@ class DeepDigScene(Scene):
                        lambda: self._do(g.repair), size=22, **primary)
             b.enabled = cost > 0
             out.append(b)
+        elif self.panel == "BANK":
+            n = g.can_exchange()
+            for k, (label, amount) in enumerate((("1 CHIP", 1), ("10 CHIPS", 10), ("100 CHIPS", 100),
+                                                 (f"ALL: {n:,}", n))):
+                b = Button((p.x + 40 + (k % 2) * 270, p.bottom - 180 + (k // 2) * 76, 250, 62),
+                           label, lambda a=amount: self._do(g.exchange, a), size=19,
+                           **(primary if 0 < amount <= n else {}))
+                b.enabled = 0 < amount <= n
+                out.append(b)
         elif self.panel == "OIL":
             if g.oil is None:
                 b = Button((p.centerx - 190, p.bottom - 100, 380, 64), f"BUY IT  {money(dd.OIL_PRICE)}",
@@ -386,6 +395,13 @@ class DeepDigScene(Scene):
                     self.app.settings.chip_bank += chips
                     self.app.settings.save()
                     self.say(f"Bot {i + 1} sold {n} ore for {money(total)}: +{chips} chip{'s' if chips != 1 else ''}!")
+                sfx.play("coin")
+            elif k == "exchange":
+                _, chips, cost = ev
+                self.app.settings.chip_bank += chips
+                self.app.settings.save()
+                self.say(f"Exchanged {money(cost)} for {chips:,} chip{'s' if chips != 1 else ''}! "
+                         f"Chip Bank: {self.app.settings.chip_bank:,}.", 3.5)
                 sfx.play("coin")
             elif k == "oil_bought":
                 sfx.play("game_win")
@@ -697,6 +713,8 @@ class DeepDigScene(Scene):
             self._draw_sell(surf, p)
         elif self.panel == "OIL":
             self._draw_oil_panel(surf, p)
+        elif self.panel == "BANK":
+            self._draw_bank_panel(surf, p)
         elif self.panel in ("SHOP", "LAB", "BOTS"):
             if self.panel == "BOTS":
                 theme.ptext(surf, "UPGRADES", (p.x + 24, p.y + 104), 16, theme.TEXT_DIM)
@@ -793,6 +811,17 @@ class DeepDigScene(Scene):
         nxt = upgrade_text(name, lvl + 1) if lvl < top else None
         theme.ptext(surf, f"{now}  >  {nxt}" if nxt else f"{now}  (BEST)", (x, y + 22), 12,
                     theme.TEXT if nxt else theme.TEXT_DIM)
+
+    def _draw_bank_panel(self, surf, p):
+        g = self.game
+        theme.ptext(surf, f"{money(dd.BANK_RATE)} = 1 CHIP", (p.centerx, p.y + 116), 30, theme.ACCENT, anchor="midtop")
+        theme.ptext(surf, "YOUR CHIP BANK", (p.x + 40, p.y + 176), 16, theme.TEXT_DIM)
+        theme.ptext(surf, f"{self.app.settings.chip_bank:,} CHIPS", (p.right - 40, p.y + 172), 22, theme.SUCCESS,
+                    anchor="topright")
+        theme.ptext(surf, "YOUR CASH BUYS", (p.x + 40, p.y + 214), 16, theme.TEXT_DIM)
+        theme.ptext(surf, f"{g.can_exchange():,} CHIPS", (p.right - 40, p.y + 210), 22, theme.TEXT, anchor="topright")
+        theme.ptext(surf, "Spend chips on card packs and more in the Card Shop.", (p.centerx, p.y + 258), 13,
+                    theme.TEXT_DIM, anchor="midtop")
 
     def _draw_oil_panel(self, surf, p):
         g = self.game

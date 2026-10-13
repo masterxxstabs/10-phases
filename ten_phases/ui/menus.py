@@ -462,6 +462,7 @@ HOW_TO_DEEPDIG = [
     "Watch out for gas pockets, lava, grey boulders you can't drill (blast them with dynamite) and long falls.",
     "Items, keys 1-5: repair kit, fuel can, dynamite, mega blast and a teleporter home.",
     "The Oil Refinery sells you an oil field: scan, build rigs, pipe down to oil and truck it to the best buyer.",
+    "The Bank turns your cash into Chip Bank chips ($2,500 each) for card packs and more.",
     "Every $500 of ore you sell puts 1 chip in your Chip Bank. Find the Heart of the Earth, then keep going: "
     "the ground never ends.",
 ]

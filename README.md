@@ -244,7 +244,7 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 - **Items (keys 1-5):** repair kit, fuel can, dynamite, mega blast and teleporter.
 - **Ore:** 17 kinds, from coal and iron near the top to diamonds, relics and meteorites far down.
 - **No bottom:** the Heart of the Earth waits about 5,200 ft down, and the ground keeps going forever below it, made as you dig, with richer ore and more heat the deeper you go.
-- **Chips:** every $500 of ore you sell adds 1 chip to your Chip Bank.
+- **Chips:** every $500 of ore you sell adds 1 chip to your Chip Bank. The **bank** (far left of town) also turns cash into chips at $2,500 each (1, 10, 100 or all you can), so you can mine your way to card packs.
 
 ## Slots
 

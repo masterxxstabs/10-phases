@@ -4,6 +4,11 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.19.0
+
+- Deep Dig: a Bank in town! Turn your Deep Dig cash into Chip Bank chips ($2,500 each) and spend them on card packs and more
+- Exchange 1, 10, 100 or as many chips as your cash buys
+
 ## 1.18.0
 
 - Deep Dig: the Oil Field! Buy the oil business at the new Oil Refinery in town and run your own oil field, Turmoil-style but it never ends
