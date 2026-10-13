@@ -12,7 +12,9 @@
     makes it CHUNK rows at a time as you dig, and saves keep the rows made so far. Tile numbers are saved, so
     only ever add ores at the end of `ORES` (the core is tile 9; v1 saves had it at 20 and are migrated).
     The town is at negative columns (`TOWN_W`), outside the saved grid: `tile()` answers for it. Dig bots
-    (`Bot`, `_step_bot`) live in the engine and are saved with the game.
+    (`Bot`, `_step_bot`) live in the engine and are saved with the game. The Oil Field (`deepdig/oil.py`,
+    `ui/oil_scene.py`) is bought at the OIL building; it lives on the game as `game.oil`, runs in `step_oil`
+    every frame (in the mine too), spends `game.cash`, and its plots are made from the seed and plot number.
 - Display: everything draws on a 1280x800 canvas and `pygame.SCALED` fits it to the window or screen (and maps
   the mouse). Fullscreen (`App.set_fullscreen`, F11, Alt+Enter, Settings > DISPLAY) toggles in place; never
   call `set_mode` again while running (it can leave a broken screen).

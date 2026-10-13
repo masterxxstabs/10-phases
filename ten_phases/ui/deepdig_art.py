@@ -335,6 +335,7 @@ BUILDING_STYLE = {
     "LAB": ((150, 90, 230), "TECH LAB"),
     "REPAIR": ((240, 150, 40), "REPAIRS"),
     "BOTS": ((40, 180, 170), "ROBOTICS"),
+    "OIL": ((70, 70, 84), "OIL REFINERY"),
 }
 BOT_COLORS = [(60, 210, 200), (255, 120, 180), (170, 230, 70)]
 BUILDING_TAGLINE = {
@@ -344,6 +345,7 @@ BUILDING_TAGLINE = {
     "LAB": "Gadgets, gear and things that go boom",
     "REPAIR": "Dents out, good as new",
     "BOTS": "Little robots that dig while you dig",
+    "OIL": "Your oil business: drill, pump, haul and sell",
 }
 GROUND = 196          # the height of a building picture; its bottom row sits on the ground
 
@@ -380,7 +382,7 @@ def building(name: str, width: int, lit: bool = False) -> pygame.Surface:
     color, label = BUILDING_STYLE[name]
     s = pygame.Surface((width, GROUND), pygame.SRCALPHA)
     {"FUEL": _fuel_station, "SELL": _ore_buyer, "SHOP": _garage, "LAB": _lab, "REPAIR": _repairs,
-     "BOTS": _robotics}[name](
+     "BOTS": _robotics, "OIL": _refinery}[name](
         s, width, color, label, lit)
     _cache[key] = s
     return s
@@ -591,6 +593,43 @@ def bot_sprite(color, dx: int, dy: int, spin: float, clock: float, size: int = 2
     for k in range(min(carry, 5)):                      # little lights: how full it is
         circ((255, 220, 90), 11 + k * 2.5, 22.5 - 3, 0.8)
     return pygame.transform.smoothscale(s, (size, size))
+
+
+def _refinery(s, w, color, label, lit):
+    """Storage tanks, a cracking tower with a flare on top, and pipes everywhere."""
+    for k, x in enumerate((10, 70)):                          # two fat storage tanks
+        tank = _box(s, (214, 218, 226), (x, GROUND - 70, 54, 68), 10)
+        pygame.draw.rect(s, (180, 186, 196), (tank.x, tank.y + 14, tank.w, 6))
+        pygame.draw.ellipse(s, (236, 240, 246), (tank.x + 2, tank.y - 4, tank.w - 4, 14))
+        pygame.draw.rect(s, (40, 40, 48), (tank.x + 8, tank.bottom - 30, 10, 26), border_radius=2)
+    tower = _box(s, (150, 156, 170), (w - 70, 44, 34, GROUND - 46), 4)  # the cracking tower
+    for y in range(tower.y + 14, tower.bottom - 6, 22):
+        pygame.draw.rect(s, (110, 116, 130), (tower.x - 4, y, tower.w + 8, 5))
+    pygame.draw.line(s, theme.OUTLINE, (w - 22, 44), (w - 22, 14), 6)  # the flare stack
+    pygame.draw.line(s, (130, 136, 150), (w - 22, 44), (w - 22, 14), 3)
+    flame = 10 if lit else 7
+    pygame.draw.polygon(s, (255, 140, 30), [(w - 28, 14), (w - 16, 14), (w - 22, 14 - flame * 2)])
+    pygame.draw.polygon(s, (255, 230, 120), [(w - 25, 14), (w - 19, 14), (w - 22, 14 - flame)])
+    for y in (GROUND - 40, GROUND - 20):                      # pipework between it all
+        pygame.draw.line(s, theme.OUTLINE, (60, y), (w - 70, y), 7)
+        pygame.draw.line(s, (200, 120, 60), (60, y), (w - 70, y), 4)
+    pygame.draw.circle(s, (255, 90, 70) if lit else (120, 40, 40), (w - 53, 40), 4)
+    _sign(s, label, (60, 60, 72), (w // 2 - 6, GROUND - 100), 16)
+    pygame.draw.circle(s, (30, 30, 36), (w // 2 - 80, GROUND - 100), 9)            # an oil drop on the sign
+    pygame.draw.polygon(s, (30, 30, 36), [(w // 2 - 88, GROUND - 103), (w // 2 - 72, GROUND - 103),
+                                          (w // 2 - 80, GROUND - 118)])
+    pygame.draw.circle(s, (120, 120, 140), (w // 2 - 83, GROUND - 103), 2)
+
+
+def oil_buyer(label: str, color, width: int, lit: bool) -> pygame.Surface:
+    """A refinery that buys oil (the Oil Field's two buyers)."""
+    key = ("buyer", label, width, lit)
+    if key in _cache:
+        return _cache[key]
+    s = pygame.Surface((width, GROUND), pygame.SRCALPHA)
+    _refinery(s, width, color, label, lit)
+    _cache[key] = s
+    return s
 
 
 def mine_sign(lit: bool) -> pygame.Surface:

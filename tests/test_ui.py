@@ -294,6 +294,17 @@ def test_shop_collection_pages(app):
     _drive(app)
 
 
+def _oil_field(app):
+    from ten_phases.deepdig.engine import DeepDig
+    from ten_phases.deepdig.oil import OilField
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    from ten_phases.ui.oil_scene import OilFieldScene
+    g = DeepDig(seed=3)
+    g.cash = 10 ** 6
+    g.oil = OilField(5, g)
+    return OilFieldScene(app, DeepDigScene(app, g))
+
+
 def test_random_clicking_never_crashes_any_screen(app):
     """Mash the mouse and keyboard on every screen (without leaving it) and keep drawing."""
     import random
@@ -328,7 +339,7 @@ def test_random_clicking_never_crashes_any_screen(app):
               lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng)),
               lambda: MonopolyScene(app), lambda: MonopolySetupScene(app), lambda: HowToScene(app, "MONOPOLY"),
               lambda: ProfileScene(app), lambda: ShopScene(app, tab="PICTURES"), lambda: ShopScene(app, tab="BACKGROUNDS"),
-              lambda: DeepDigScene(app), lambda: HowToScene(app, "DEEP DIG")]
+              lambda: DeepDigScene(app), lambda: HowToScene(app, "DEEP DIG"), lambda: _oil_field(app)]
     keys = [pygame.K_SPACE, pygame.K_RETURN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_1, pygame.K_DOWN,
             pygame.K_e, pygame.K_ESCAPE]
     for make in makers:

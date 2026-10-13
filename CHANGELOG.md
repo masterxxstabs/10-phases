@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.18.0
+
+- Deep Dig: the Oil Field! Buy the oil business at the new Oil Refinery in town and run your own oil field, Turmoil-style but it never ends
+- Scan for oil, build rigs, lay pipes around rock (and watch out for gas), then truck the oil to ACME or PETRO, whichever pays more right now
+- Buy land to the right forever (richer every plot), upgrade pumps, tanks, trucks and drills, and get a dispatcher so the trucks drive themselves
+- It keeps pumping while you dig, and every sale counts toward chips. Works with a controller too
+
 ## 1.17.0
 
 - Controller support for every game! Plug in an Xbox, PlayStation or Switch Pro controller (or most others)

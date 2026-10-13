@@ -173,6 +173,15 @@ class DeepDigScene(Scene):
                        lambda: self._do(g.repair), size=22, **primary)
             b.enabled = cost > 0
             out.append(b)
+        elif self.panel == "OIL":
+            if g.oil is None:
+                b = Button((p.centerx - 190, p.bottom - 100, 380, 64), f"BUY IT  {money(dd.OIL_PRICE)}",
+                           lambda: self._do(g.buy_oil), size=22, **primary)
+                b.enabled = g.cash >= dd.OIL_PRICE
+            else:
+                b = Button((p.centerx - 190, p.bottom - 100, 380, 64), "GO TO THE OIL FIELD", self.enter_oil, size=22,
+                           **primary)
+            out.append(b)
         elif self.panel == "SELL":
             b = Button((p.centerx - 170, p.bottom - 90, 340, 56),
                        f"SELL ALL  {money(g.cargo_value)}" if g.cargo else "NOTHING TO SELL",
@@ -198,6 +207,14 @@ class DeepDigScene(Scene):
                     out.append(b)
         out.append(Button((p.right - 62, p.y + 18, 46, 44), "X", self.close_panel, size=18))
         self.panel_buttons = out
+
+    def enter_oil(self):
+        """Over to the Oil Field (it comes back here when you leave it)."""
+        from .oil_scene import OilFieldScene
+        self.panel = None
+        self.panel_buttons = []
+        self.save()
+        self.app.go(OilFieldScene(self.app, self))
 
     def panel_rect(self) -> pygame.Rect:
         if self.panel in ("SHOP", "LAB", "BOTS"):
@@ -370,6 +387,15 @@ class DeepDigScene(Scene):
                     self.app.settings.save()
                     self.say(f"Bot {i + 1} sold {n} ore for {money(total)}: +{chips} chip{'s' if chips != 1 else ''}!")
                 sfx.play("coin")
+            elif k == "oil_bought":
+                sfx.play("game_win")
+                self.say("You're in the oil business! Press GO TO THE OIL FIELD to start drilling.", 4.0)
+            elif k == "oil_sell":
+                _, total, chips, side = ev
+                if chips:
+                    self.app.settings.chip_bank += chips
+                    self.app.settings.save()
+                    self.say(f"Your oil trucks sold {money(total)} of oil: +{chips} chip{'s' if chips != 1 else ''}!")
             elif k == "town":
                 self.say("No digging in town: it's built on solid foundations. Roll right to the mine!", 2.4)
                 sfx.play("deselect")
@@ -669,6 +695,8 @@ class DeepDigScene(Scene):
                         anchor="center")
         elif self.panel == "SELL":
             self._draw_sell(surf, p)
+        elif self.panel == "OIL":
+            self._draw_oil_panel(surf, p)
         elif self.panel in ("SHOP", "LAB", "BOTS"):
             if self.panel == "BOTS":
                 theme.ptext(surf, "UPGRADES", (p.x + 24, p.y + 104), 16, theme.TEXT_DIM)
@@ -765,6 +793,31 @@ class DeepDigScene(Scene):
         nxt = upgrade_text(name, lvl + 1) if lvl < top else None
         theme.ptext(surf, f"{now}  >  {nxt}" if nxt else f"{now}  (BEST)", (x, y + 22), 12,
                     theme.TEXT if nxt else theme.TEXT_DIM)
+
+    def _draw_oil_panel(self, surf, p):
+        g = self.game
+        x, y = p.x + 40, p.y + 116
+        if g.oil is None:
+            lines = ["Buy into oil: your own field of land next to town.",
+                     "Scan for oil, build rigs and lay pipes down to it,",
+                     "then truck the oil to whichever buyer pays more.",
+                     "It never stops: buy more land whenever you like,",
+                     "and it keeps pumping while you dig."]
+            for line in lines:
+                theme.text(surf, line, (x, y), 17, theme.TEXT, bold=False)
+                y += 32
+            return
+        oil = g.oil
+        stored = sum(r.tank for r in oil.rigs) + sum(t.load for t in oil.trucks)
+        rows = [("LAND", f"{oil.plots} plots"), ("RIGS", str(len(oil.rigs))), ("TRUCKS", str(len(oil.trucks))),
+                ("OIL WAITING", f"{int(stored):,} barrels"),
+                ("PRICES", f"ACME ${oil.prices['L']:.2f}   PETRO ${oil.prices['R']:.2f}"),
+                ("EARNED", money(oil.earned))]
+        for label, value in rows:
+            theme.ptext(surf, label, (x, y), 16, theme.TEXT_DIM)
+            theme.ptext(surf, value, (p.right - 40, y), 18, theme.SUCCESS if label == "EARNED" else theme.TEXT,
+                        anchor="topright")
+            y += 38
 
     def _draw_sell(self, surf, p):
         g = self.game

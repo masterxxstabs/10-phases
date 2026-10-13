@@ -13,6 +13,8 @@ import math
 import random
 from dataclasses import dataclass
 
+from .oil import OilField
+
 W = 36                 # tiles across
 H = 420                # the Heart of the Earth's layer; the ground goes on forever below it
 CHUNK = 60             # the world is made this many rows at a time, as you dig down to it
@@ -93,8 +95,9 @@ def solid(t: int) -> bool:
 # --------------------------------------------------------------------------- the surface
 
 # The town sits on solid foundations to the left of the mine (columns -TOWN_W to -1): you can't dig there.
-TOWN_W = 48
+TOWN_W = 56
 BUILDINGS = {   # name: (first column, last column)
+    "OIL": (-54, -49),
     "BOTS": (-46, -41),
     "FUEL": (-38, -34),
     "SELL": (-31, -26),
@@ -102,6 +105,7 @@ BUILDINGS = {   # name: (first column, last column)
     "LAB": (-15, -10),
     "REPAIR": (-7, -4),
 }
+OIL_PRICE = 20000      # buying into the oil business (the Oil Field mini-game)
 START_X = -1.5         # where you start, and where the tow truck drops you: the town's edge, by the mine
 
 # --------------------------------------------------------------------------- upgrades and items
@@ -275,6 +279,7 @@ class DeepDig:
         self.clock = 0.0
         self.bots: list[Bot] = []
         self.bot_earned = 0        # $ the bots have made, all time
+        self.oil: OilField | None = None   # the oil business, once you've bought it
 
     # ---------------------------------------------------------------- stats
 
@@ -367,6 +372,7 @@ class DeepDig:
 
     def _step(self, dt: float, left: bool, right: bool, up: bool, down: bool) -> None:
         self.clock += dt
+        self.step_oil(dt)
         for i, bot in enumerate(self.bots):
             self._step_bot(i, bot, dt)
         self.thrusting = False
@@ -611,7 +617,8 @@ class DeepDig:
 
     def _need(self, name: str) -> None:
         if self.building() != name:
-            label = {"SHOP": "Garage", "LAB": "Tech Lab", "SELL": "Ore Buyer"}.get(name, name.title())
+            label = {"SHOP": "Garage", "LAB": "Tech Lab", "SELL": "Ore Buyer", "OIL": "Oil Refinery",
+                     "BOTS": "Robotics"}.get(name, name.title())
             raise DigError(f"Park at the {label} first.")
 
     def refuel_cost(self) -> int:
@@ -670,6 +677,32 @@ class DeepDig:
         self.cargo = []
         self.events.append(("sell", total, chips, counts))
         return total, chips
+
+    # ---------------------------------------------------------------- the oil business
+
+    def buy_oil(self) -> None:
+        self._need("OIL")
+        if self.oil is not None:
+            raise DigError("You already own the oil business.")
+        if self.cash < OIL_PRICE:
+            raise DigError(f"You need ${OIL_PRICE - self.cash:,} more.")
+        self.cash -= OIL_PRICE
+        self.oil = OilField(self.seed + 17, self)
+        self.events.append(("oil_bought",))
+
+    def step_oil(self, dt: float) -> list[tuple]:
+        """The oil field runs all the time (even while you dig). Its sales are banked here, and its other
+        events are handed back for the Oil Field screen to show."""
+        if self.oil is None:
+            return []
+        self.oil.step(dt)
+        out = []
+        for ev in self.oil.pop_events():
+            if ev[0] == "sell":
+                chips = self._bank(ev[1])
+                self.events.append(("oil_sell", ev[1], chips, ev[2]))
+            out.append(ev)
+        return out
 
     def _bank(self, total: int) -> int:
         """Money from ore: cash, the all-time total, and chips for the Chip Bank (returned)."""
@@ -826,6 +859,7 @@ class DeepDig:
             "cash": self.cash, "cargo": self.cargo, "items": self.items, "deepest": self.deepest,
             "earned": self.earned, "chip_progress": self.chip_progress, "won": self.won,
             "bots": [[b.col, b.row, b.state, b.carry] for b in self.bots], "bot_earned": self.bot_earned,
+            "oil": self.oil.to_dict() if self.oil else None,
         }
 
     @classmethod
@@ -868,6 +902,11 @@ class DeepDig:
         g.chip_progress = int(num("chip_progress", 0, CHIP_EVERY - 1, 0))
         g.won = bool(d.get("won", False))
         g.bot_earned = int(num("bot_earned", 0, 10 ** 12, 0))
+        if isinstance(d.get("oil"), dict):
+            try:
+                g.oil = OilField.from_dict(d["oil"], g)
+            except (TypeError, ValueError, KeyError):
+                g.oil = OilField(g.seed + 17, g)     # owned, but the save was broken: a fresh field
         g._sync_bots()
         saved = d.get("bots")
         for bot, b in zip(g.bots, saved if isinstance(saved, list) else []):

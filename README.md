@@ -238,6 +238,7 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 - **Digging:** arrows or WASD. Press down to drill down, push into a wall to drill sideways, and press up to fly (that burns fuel). Grey boulders are too hard to drill: go around them or blow them up.
 - **Town:** it sits to the left of the mine, built on solid foundations you can't dig through (rolling along the surface is free). Park in front of a building and press **E**: the **fuel station** fills your tank, the **ore buyer** pays cash for your cargo, the **garage** sells pod parts (drill, roof drill, hull, engine, fuel tank, cargo hold, radiator, shocks), the **tech lab** sells gadgets (lamp, ore scanner, armor, refinery, rescue insurance) and items, and **repairs** fixes your hull. Most upgrades have 7 levels.
 - **Digging up:** buy the **roof drill** at the garage, then hold Up against a ceiling to drill upward.
+- **Oil Field:** buy the oil business at the **oil refinery** (far left of town) for $20,000, then press E there to go to your oil field. It plays like *Turmoil*, but it never ends: scan the ground for oil, build rigs, click where the pipes should go (they route around rock you've found; hidden rock stops the drill and refunds the rest, and gas pockets blow the tip off), and truck the oil to whichever buyer pays more. ACME OIL is on the left and PETRO CO on the right, and their prices keep moving (and drop when you flood them). Buy more land to the right any time: each plot is richer than the last. Upgrades: pumps, tanks, truck size and speed, drill bits, a rock bit, and a **dispatcher** that lets the trucks run themselves. The field keeps running while you dig, and its sales count toward chips. Keys: 1 scan, 2 rig, 3 pipe, 4 truck, U upgrades, L land, T autopilot, Tab next truck, arrows scroll, Esc back.
 - **Dig bots:** the **robotics** building sells up to 3 little drilling robots. They tunnel toward ore on their own (around rock, gas and lava), bring it up and sell it for you, chips and refinery bonus included. **BOT LEVEL** makes them faster, carry more and dig deeper.
 - **Danger:** gas pockets explode, lava burns, falling too far dents the hull, and deep down the heat wears the hull away unless you have a radiator. Run out of fuel or hull underground and you're towed home for a fee, and your cargo is lost.
 - **Items (keys 1-5):** repair kit, fuel can, dynamite, mega blast and teleporter.
@@ -329,6 +330,7 @@ Plug in a controller (Xbox, PlayStation, Switch Pro or any other pad your comput
 | Poker | X check/call, Y raise, LB fold, D-pad bet size |
 | Monopoly | X roll / carry on |
 | Deep Dig | Stick or D-pad fly and drill, A use a building, LB/RB/X/LT/Y items 1-5, Start pause. In a shop the pointer comes back |
+| Oil Field | Pointer and A (pick a tool, click the ground, click a truck then a rig or buyer), LB/RB change tool, X autopilot, Y upgrades, View/Back next truck, D-pad scroll, B back |
 
 ## Settings
 
