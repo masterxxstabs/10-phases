@@ -14,13 +14,16 @@ import random
 from dataclasses import dataclass
 
 W = 36                 # tiles across
-H = 420                # rows of ground (the core is at the bottom)
+H = 420                # the Heart of the Earth's layer; the ground goes on forever below it
+CHUNK = 60             # the world is made this many rows at a time, as you dig down to it
+DEEP_ORE_ROW = 400     # below here every ore keeps its mix from this row (and gets more common)
 FEET_PER_ROW = 12.5    # for the depth readout
 
 # --------------------------------------------------------------------------- tiles
 
 AIR, DIRT, ROCK, GAS, LAVA, BEDROCK, CONCRETE = range(7)
-ORE0 = 10   # ore kinds start here
+CORE = 9    # the Heart of the Earth, waiting at the very bottom
+ORE0 = 10   # ore kinds start here (new ores only ever go on the end, so saved worlds keep their ore)
 
 
 @dataclass(frozen=True)
@@ -44,19 +47,27 @@ ORES = (
     Ore("RUBY", 15000, 270, 370, 0.009, (235, 40, 70)),
     Ore("DIAMOND", 50000, 320, 405, 0.006, (190, 240, 255)),
     Ore("RELIC", 150000, 360, 412, 0.003, (200, 120, 255)),
+    Ore("COAL", 20, 1, 12, 0.070, (58, 58, 66)),
+    Ore("QUARTZ", 90, 20, 70, 0.035, (255, 205, 232)),
+    Ore("AMBER", 450, 100, 165, 0.022, (255, 150, 10)),
+    Ore("TITANIUM", 1200, 150, 260, 0.016, (120, 132, 156)),
+    Ore("AMETHYST", 3500, 200, 300, 0.012, (150, 70, 200)),
+    Ore("SAPPHIRE", 9000, 240, 345, 0.009, (40, 80, 230)),
+    Ore("METEORITE", 80000, 340, 404, 0.004, (90, 255, 210)),
 )
-CORE = ORE0 + len(ORES)          # the Heart of the Earth, waiting at the very bottom
+ORE_END = ORE0 + len(ORES)
+OLD_CORE = 20                    # where saves from before v2 kept the core
 CORE_VALUE = 1_000_000
 SOLID = {DIRT, ROCK, GAS, LAVA, BEDROCK, CONCRETE}
 UNDRILLABLE = {ROCK, BEDROCK, CONCRETE}
 
 
 def is_ore(t: int) -> bool:
-    return ORE0 <= t <= CORE
+    return ORE0 <= t < ORE_END or t == CORE
 
 
 def ore_of(t: int) -> Ore | None:
-    if ORE0 <= t < CORE:
+    if ORE0 <= t < ORE_END:
         return ORES[t - ORE0]
     return None
 
@@ -93,12 +104,24 @@ START_X = 16.5
 
 UPGRADES = {
     # name: (values per level, prices to reach each level)
-    "DRILL": ((1.0, 1.45, 2.0, 2.8, 3.8, 5.2), (0, 750, 2500, 7500, 25000, 90000)),
-    "HULL": ((100, 150, 220, 320, 460, 650), (0, 750, 2500, 7500, 25000, 90000)),
-    "ENGINE": ((1.0, 1.2, 1.45, 1.75, 2.1, 2.5), (0, 750, 2500, 7500, 25000, 90000)),
-    "FUEL TANK": ((15, 24, 36, 52, 76, 115), (0, 750, 2000, 6000, 20000, 70000)),
-    "CARGO": ((8, 15, 25, 40, 65, 100), (0, 750, 2000, 6000, 20000, 70000)),
-    "RADIATOR": ((0.0, 0.25, 0.45, 0.65, 0.8, 0.92), (0, 1000, 3500, 10000, 30000, 100000)),
+    "DRILL": ((1.0, 1.45, 2.0, 2.8, 3.8, 5.2, 7.0, 9.5),
+              (0, 750, 2500, 7500, 25000, 90000, 250000, 600000)),
+    "HULL": ((100, 150, 220, 320, 460, 650, 900, 1250),
+             (0, 750, 2500, 7500, 25000, 90000, 250000, 600000)),
+    "ENGINE": ((1.0, 1.2, 1.45, 1.75, 2.1, 2.5, 2.9, 3.4),
+               (0, 750, 2500, 7500, 25000, 90000, 250000, 600000)),
+    "FUEL TANK": ((15, 24, 36, 52, 76, 115, 160, 220),
+                  (0, 750, 2000, 6000, 20000, 70000, 200000, 500000)),
+    "CARGO": ((8, 15, 25, 40, 65, 100, 140, 200),
+              (0, 750, 2000, 6000, 20000, 70000, 200000, 500000)),
+    "RADIATOR": ((0.0, 0.25, 0.45, 0.65, 0.8, 0.92, 0.96, 0.99),
+                 (0, 1000, 3500, 10000, 30000, 100000, 250000, 600000)),
+    "SHOCKS": ((8.0, 9.5, 11.0, 12.5, 14.0, 15.0, 16.0, 17.0),     # how fast you can land without damage
+               (0, 600, 2000, 6000, 15000, 40000, 100000, 250000)),
+    "LAMP": ((7.5, 9.5, 11.5, 14.0, 17.0, 20.5, 24.5, 29.0),       # light radius, in tiles
+             (0, 500, 1500, 4000, 10000, 25000, 60000, 150000)),
+    "SCANNER": ((0, 3, 5, 7, 9, 12, 15, 20),                       # ore shows through the dark this many tiles away
+                (0, 1000, 3000, 8000, 20000, 50000, 120000, 300000)),
 }
 UPGRADE_INFO = {
     "DRILL": "Drill faster through everything",
@@ -107,7 +130,19 @@ UPGRADE_INFO = {
     "FUEL TANK": "Stay down longer",
     "CARGO": "Carry more ore",
     "RADIATOR": "Stay cool in the hot depths",
+    "SHOCKS": "Land harder without denting the hull",
+    "LAMP": "A brighter light in the dark",
+    "SCANNER": "Spot ore through the dark",
 }
+
+
+def upgrade_text(name: str, level: int) -> str:
+    """What an upgrade level does, in a few characters."""
+    v = UPGRADES[name][0][level]
+    return {"DRILL": f"x{v:g} SPEED", "HULL": f"{v} HP", "ENGINE": f"x{v:g} POWER", "FUEL TANK": f"{v} L",
+            "CARGO": f"{v} SLOTS", "RADIATOR": f"{round(v * 100)}% COOLER",
+            "SHOCKS": "NO FALL DAMAGE" if v > MAX_FALL else f"SAFE TO {v:g}",
+            "LAMP": f"{v:g} TILES", "SCANNER": f"{v} TILES" if v else "NONE"}[name]
 ITEMS = {
     # name: (price, what it does)
     "REPAIR KIT": (1500, "Fix 35% of your hull anywhere"),
@@ -130,7 +165,6 @@ ACCEL = 20.0
 MAX_RUN = 5.0
 MAX_RISE = 6.0
 MAX_FALL = 16.0
-SAFE_LANDING = 8.0   # landing faster than this hurts
 BURN = {"idle": 0.02, "move": 0.08, "thrust": 0.26, "drill": 0.24}
 HEAT_START = 140     # rows below which it starts getting hot
 
@@ -215,21 +249,30 @@ class DeepDig:
         return None
 
     def heat(self) -> float:
-        """0 (cool) to 1 (scorching), by depth."""
-        return max(0.0, min(1.0, (self.y - HEAT_START) / (H - HEAT_START)))
+        """0 (cool), 1 (scorching, at the Heart's depth) up to 3 far below it."""
+        return max(0.0, min(3.0, (self.y - HEAT_START) / (H - HEAT_START)))   # keeps rising past the Heart
 
     # ---------------------------------------------------------------- the grid
 
     def tile(self, col: int, row: int) -> int:
-        if col < 0 or col >= W or row >= H:
+        if col < 0 or col >= W:
             return BEDROCK
         if row < 0:
             return AIR
+        if row >= len(self.grid):
+            self._grow(row)
         return self.grid[row][col]
 
     def set_tile(self, col: int, row: int, t: int) -> None:
-        if 0 <= col < W and 0 <= row < H:
+        if 0 <= col < W and row >= 0:
+            if row >= len(self.grid):
+                self._grow(row)
             self.grid[row][col] = t
+
+    def _grow(self, row: int) -> None:
+        """Make the ground down to this row (each chunk comes out the same for a seed, whenever it's made)."""
+        while len(self.grid) <= row:
+            self.grid.extend(make_chunk(self.seed, len(self.grid) // CHUNK))
 
     def _hits(self, x: float, y: float) -> bool:
         """Does a pod at (x, y) overlap anything solid?"""
@@ -242,7 +285,14 @@ class DeepDig:
     # ---------------------------------------------------------------- a frame
 
     def step(self, dt: float, left=False, right=False, up=False, down=False) -> None:
-        dt = min(dt, 0.05)
+        """Advance by dt seconds (in small slices, so a slow frame doesn't slow the game or skip walls)."""
+        dt = max(0.0, min(dt, 0.25))
+        while dt > 1e-9:
+            part = min(dt, 1 / 30)
+            self._step(part, left, right, up, down)
+            dt -= part
+
+    def _step(self, dt: float, left: bool, right: bool, up: bool, down: bool) -> None:
         self.clock += dt
         self.thrusting = False
         if self.drill:
@@ -299,8 +349,9 @@ class DeepDig:
         if self._hits(self.x, ny):
             if self.vy > 0:   # landed
                 self.y = math.floor(ny + HALF) - HALF
-                if was_falling > SAFE_LANDING:
-                    self._hurt((was_falling - SAFE_LANDING) * 7, "landed too hard")
+                safe = self.stat("SHOCKS")
+                if was_falling > safe:
+                    self._hurt((was_falling - safe) * 7, "landed too hard")
                     self.events.append(("bump", was_falling))
                 if not self.grounded:
                     self.events.append(("land", was_falling))
@@ -364,11 +415,11 @@ class DeepDig:
         base = {DIRT: 0.42, GAS: 0.42, LAVA: 0.5}.get(t)
         if base is None:
             base = 0.55 + 0.05 * (t - ORE0) if is_ore(t) else 0.42
-        return base * (1 + 1.6 * row / H) / self.stat("DRILL")
+        return base * min(4.0, 1 + 1.6 * row / H) / self.stat("DRILL")
 
     def _try_drill(self, col: int, row: int, sideways: bool = False) -> None:
         t = self.tile(col, row)
-        if row < 0 or not solid(t):
+        if row < 0 or not solid(t) or not 0 <= col < W:   # (the world's edge is just a wall)
             return
         if t == CORE and len(self.cargo) >= self.cargo_space:
             if not any(e[0] == "full" for e in self.events):
@@ -410,7 +461,7 @@ class DeepDig:
     def _dug(self, col: int, row: int) -> None:
         t = self.tile(col, row)
         self.set_tile(col, row, AIR)
-        depth = 1 + 2 * row / H
+        depth = min(6.0, 1 + 2 * row / H)
         if t == GAS:
             self.events.append(("boom", col, row, "gas"))
             self._hurt(18 * depth, "a gas pocket exploded")
@@ -475,13 +526,17 @@ class DeepDig:
     def refuel_cost(self) -> int:
         return int(math.ceil((self.max_fuel - self.fuel) * FUEL_PRICE))
 
+    def emergency_fuel(self) -> bool:
+        """Broke (can't buy a single litre) and nearly empty: the next fill-up is free."""
+        return self.cash < FUEL_PRICE and self.fuel < 0.25 * self.max_fuel
+
     def refuel(self) -> int:
         self._need("FUEL")
         need = self.max_fuel - self.fuel
         if need <= 0.01:
             raise DigError("Your tank is already full.")
         afford = min(need, self.cash / FUEL_PRICE)
-        if afford <= 0 and self.fuel < 0.25 * self.max_fuel:
+        if self.emergency_fuel():
             # Broke and empty: the station gives you enough to go and dig something up.
             self.fuel = 0.3 * self.max_fuel
             self.events.append(("refuel", 0))
@@ -567,7 +622,7 @@ class DeepDig:
     def to_dict(self) -> dict:
         x, y = self.drill.start if self.drill else (self.x, self.y)    # mid-drill, save where the drill began
         return {
-            "v": 1, "seed": self.seed, "grid": ["".join(chr(48 + t) for t in row) for row in self.grid],
+            "v": 2, "seed": self.seed, "grid": ["".join(chr(48 + t) for t in row) for row in self.grid],
             "x": x, "y": y, "levels": self.levels, "fuel": self.fuel, "hull": self.hull,
             "cash": self.cash, "cargo": self.cargo, "items": self.items, "deepest": self.deepest,
             "earned": self.earned, "chip_progress": self.chip_progress, "won": self.won,
@@ -577,10 +632,17 @@ class DeepDig:
     def from_dict(cls, d: dict) -> "DeepDig":
         """Load a saved game (anything broken falls back to safe values)."""
         g = cls(seed=int(d.get("seed", 1)))
+        old = d.get("v", 1) == 1          # saved before the core moved to its own tile number
         rows = d.get("grid")
-        if isinstance(rows, list) and len(rows) == H and all(isinstance(r, str) and len(r) == W for r in rows):
-            valid = set(range(7)) | set(range(ORE0, CORE + 1))
+        if (isinstance(rows, list) and rows and len(rows) % CHUNK == 0 and len(rows) <= 2000 * CHUNK
+                and all(isinstance(r, str) and len(r) == W for r in rows)):
+            valid = set(range(7)) | {CORE} | set(range(ORE0, ORE_END))
             grid = [[ord(ch) - 48 for ch in r] for r in rows]
+            if old:   # the old world had a bedrock floor under the core: open it up
+                grid = [[CORE if t == OLD_CORE else t for t in r] for r in grid]
+                for row in range(max(0, len(grid) - 3), len(grid)):
+                    grid[row] = [t if abs(c - W // 2) <= 3 and row == len(grid) - 3 else (DIRT if t == BEDROCK else t)
+                                 for c, t in enumerate(grid[row])]
             if all(t in valid for r in grid for t in r):
                 g.grid = grid
         for name in UPGRADES:
@@ -594,16 +656,20 @@ class DeepDig:
             v = d.get(key, default)
             return max(lo, min(hi, v)) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
         g.x = float(num("x", HALF, W - HALF, START_X))
-        g.y = float(num("y", -HALF, H - 1, -HALF))
+        g.y = float(num("y", -HALF, len(g.grid) - 1, -HALF))
         g.fuel = float(num("fuel", 0, g.max_fuel, g.max_fuel))
         g.hull = float(num("hull", 1, g.max_hull, g.max_hull))
         g.cash = int(num("cash", 0, 10 ** 12, 0))
-        g.deepest = int(num("deepest", 0, H, 0))
+        g.deepest = int(num("deepest", 0, len(g.grid), 0))
         g.earned = int(num("earned", 0, 10 ** 12, 0))
         g.chip_progress = int(num("chip_progress", 0, CHIP_EVERY - 1, 0))
         g.won = bool(d.get("won", False))
         cargo = d.get("cargo", [])
-        g.cargo = [t for t in cargo if isinstance(t, int) and is_ore(t)][:g.cargo_space] if isinstance(cargo, list) else []
+        if not isinstance(cargo, list):
+            cargo = []
+        if old:
+            cargo = [CORE if t == OLD_CORE else t for t in cargo]
+        g.cargo = [t for t in cargo if isinstance(t, int) and not isinstance(t, bool) and is_ore(t)][:g.cargo_space]
         if g._hits(g.x, g.y):   # saved inside rock somehow: back to the surface
             g.x, g.y = START_X, -HALF
         g.grounded = g._hits(g.x, g.y + 0.06)
@@ -613,54 +679,66 @@ class DeepDig:
 # --------------------------------------------------------------------------- making the world
 
 
-def generate(seed: int) -> list[list[int]]:
-    """The underground: dirt, rocks, caves, hazards and ore, richer and nastier the deeper you go."""
-    rng = random.Random(seed)
-    grid = [[DIRT] * W for _ in range(H)]
-    for row in range(H):
+def generate(seed: int, rows: int = H) -> list[list[int]]:
+    """The first `rows` rows of a world (rounded up to whole chunks)."""
+    grid: list[list[int]] = []
+    while len(grid) < rows:
+        grid.extend(make_chunk(seed, len(grid) // CHUNK))
+    return grid
+
+
+def make_chunk(seed: int, chunk: int) -> list[list[int]]:
+    """CHUNK rows of underground: dirt, rocks, caves, hazards and ore, richer and nastier the deeper you go.
+
+    Below the Heart of the Earth it never ends: the deep ores stay, get more common, and so do the hazards.
+    """
+    rng = random.Random(seed * 1_000_003 + chunk * 7919)
+    top = chunk * CHUNK
+    grid = [[DIRT] * W for _ in range(CHUNK)]
+    for i in range(CHUNK):
+        row = top + i
         depth = row / H
+        ore_row = min(row, DEEP_ORE_ROW)
+        richer = 1 + min(2.0, max(0, row - H) / 600)        # past the Heart, ore keeps getting more common
         for col in range(W):
             if row == 0:
                 continue
             r = rng.random()
-            if r < 0.02 + 0.10 * depth and row > 3:
-                grid[row][col] = ROCK
+            if r < min(0.30, 0.02 + 0.10 * depth) and row > 3:
+                grid[i][col] = ROCK
                 continue
             r = rng.random()
-            if row > 25 and r < 0.012 + 0.01 * depth:
-                grid[row][col] = GAS
+            if row > 25 and r < min(0.035, 0.012 + 0.01 * depth):
+                grid[i][col] = GAS
                 continue
-            if row > 150 and r < 0.03 * depth:
-                grid[row][col] = LAVA
+            if row > 150 and r < min(0.08, 0.03 * depth):
+                grid[i][col] = LAVA
                 continue
             for k, ore in enumerate(ORES):
                 if row < ore.top:
                     continue
                 spread = max(20.0, (ore.peak - ore.top) * 1.2)
-                chance = ore.rarity * math.exp(-((row - ore.peak) / spread) ** 2)
-                if rng.random() < chance:
-                    grid[row][col] = ORE0 + k
+                chance = ore.rarity * math.exp(-((ore_row - ore.peak) / spread) ** 2)
+                if rng.random() < chance * richer:
+                    grid[i][col] = ORE0 + k
                     break
-    # Caves: little air pockets to fall into.
-    for _ in range(140):
-        cx, cy = rng.randrange(W), rng.randrange(12, H - 10)
+    # Caves: little air pockets to fall into (kept inside this chunk).
+    for _ in range(20):
+        cx, cy = rng.randrange(W), rng.randrange(CHUNK)
         for _ in range(rng.randint(3, 12)):
-            if 0 <= cx < W and 12 <= cy < H - 6:
+            if 0 <= cx < W and 0 <= cy < CHUNK and top + cy >= 12:
                 grid[cy][cx] = AIR
             cx += rng.choice((-1, 1, 0))
             cy += rng.choice((0, 0, 1, -1))
-    # Under the buildings: concrete foundations.
-    for a, b in BUILDINGS.values():
-        for col in range(a, b + 1):
-            grid[0][col] = CONCRETE
-    # The bottom: bedrock, with the core in a chamber in the middle.
-    for row in range(H - 3, H):
-        for col in range(W):
-            grid[row][col] = BEDROCK
-    mid = W // 2
-    for col in range(mid - 3, mid + 4):
-        grid[H - 4][col] = AIR
-        grid[H - 5][col] = DIRT
-    grid[H - 4][mid] = CORE
-    grid[H - 3][mid] = BEDROCK
+    if chunk == 0:   # under the buildings: concrete foundations
+        for a, b in BUILDINGS.values():
+            for col in range(a, b + 1):
+                grid[0][col] = CONCRETE
+    if top <= H - 5 < top + CHUNK:   # the Heart of the Earth, in a chamber on a bedrock plinth
+        mid = W // 2
+        for col in range(mid - 3, mid + 4):
+            grid[H - 5 - top][col] = DIRT
+            grid[H - 4 - top][col] = AIR
+            grid[H - 3 - top][col] = BEDROCK
+        grid[H - 4 - top][mid] = CORE
     return grid

@@ -40,7 +40,12 @@ class App:
         self.scene = scene
 
     def _flush_xp(self) -> None:
-        """XP earned at a table is saved when you leave it (and every few seconds while you play)."""
+        """XP earned at a table is saved when you leave it (and every few seconds while you play).
+
+        A screen with an `on_leave` (like Deep Dig's saved game) gets to save too."""
+        leave = getattr(getattr(self, "scene", None), "on_leave", None)
+        if leave is not None:
+            leave()
         xp = getattr(getattr(self, "scene", None), "xp", None)
         if xp is not None and xp._unsaved:
             xp.save()

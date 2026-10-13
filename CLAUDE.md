@@ -8,7 +8,9 @@
   unless the owner explicitly says otherwise for that game.
   - Exceptions the owner asked for: **Slots is single player** (it bets the real Chip Bank), and so is
     **Deep Dig** (`deepdig/engine.py` rules, `deepdig/save.py` its saved game, `ui/deepdig_scene.py`,
-    `ui/deepdig_art.py`; inspired by Motherload, our own code and art).
+    `ui/deepdig_art.py`; inspired by Motherload, our own code and art). The world is endless: `make_chunk`
+    makes it CHUNK rows at a time as you dig, and saves keep the rows made so far. Tile numbers are saved, so
+    only ever add ores at the end of `ORES` (the core is tile 9; v1 saves had it at 20 and are migrated).
     Single-player games go in `SINGLE_PLAYER` in `ui/menus.py`.
 
 ## How the project fits together

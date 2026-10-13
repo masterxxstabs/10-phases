@@ -236,10 +236,12 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 
 **DEEP DIG** is a mining game on the main menu, inspired by the classic Flash game *Motherload* (it's our own version, written from scratch; no code or art from the original). Like Slots it's **single player**, and your game saves itself so you can carry on later.
 - **Digging:** arrows or WASD. Press down to drill down, push into a wall to drill sideways, and press up to fly (that burns fuel). Grey boulders are too hard to drill: go around them or blow them up.
-- **Town:** park in front of a building and press **E**. The fuel station fills your tank, the ore buyer pays cash for your cargo, the shop sells upgrades (drill, hull, engine, fuel tank, cargo hold, radiator) and items, and the repair shop fixes your hull.
+- **Town:** park in front of a building and press **E**. The fuel station fills your tank, the ore buyer pays cash for your cargo, the shop sells upgrades (drill, hull, engine, fuel tank, cargo hold, radiator, shocks, lamp and an ore scanner, 7 levels each) and items, and the repair shop fixes your hull.
 - **Danger:** gas pockets explode, lava burns, falling too far dents the hull, and deep down the heat wears the hull away unless you have a radiator. Run out of fuel or hull underground and you're towed home for a fee, and your cargo is lost.
 - **Items (keys 1-5):** repair kit, fuel can, dynamite, mega blast and teleporter.
-- **Chips:** every $500 of ore you sell adds 1 chip to your Chip Bank. Somewhere at the very bottom waits the Heart of the Earth.
+- **Ore:** 17 kinds, from coal and iron near the top to diamonds, relics and meteorites far down.
+- **No bottom:** the Heart of the Earth waits about 5,200 ft down, and the ground keeps going forever below it, made as you dig, with richer ore and more heat the deeper you go.
+- **Chips:** every $500 of ore you sell adds 1 chip to your Chip Bank.
 
 ## Slots
 

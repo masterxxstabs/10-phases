@@ -446,14 +446,15 @@ HOW_TO_MONOPOLY = [
 HOW_TO_DEEPDIG = [
     "Fly your drill pod into the ground and dig for ore. Arrows or WASD: Down drills, Left/Right drill into walls, "
     "Up fires the thrusters.",
-    "Ore gets rarer and worth more the deeper you go: iron and copper near the top, then silver, gold, platinum, "
-    "uranium, emeralds, rubies, diamonds and ancient relics.",
+    "Ore gets rarer and worth more the deeper you go: coal, iron and copper near the top, down through gold, "
+    "titanium and sapphires to diamonds, ancient relics and meteorites.",
     "Watch your FUEL and HULL. Run out underground and you're towed up for a fee, and your cargo is lost.",
     "Fly back up and park at a building, then press E: sell ore at the Ore Buyer, refuel, repair, or buy upgrades.",
-    "Upgrade your drill, hull, engine, fuel tank, cargo bay and radiator (it gets hot down there).",
+    "Upgrade your drill, hull, engine, fuel tank, cargo bay, radiator (it gets hot), shocks, lamp and ore scanner.",
     "Watch out for gas pockets, lava, grey boulders you can't drill (blast them with dynamite) and long falls.",
     "Items, keys 1-5: repair kit, fuel can, dynamite, mega blast and a teleporter home.",
-    "Every $500 of ore you sell puts 1 chip in your Chip Bank. Find the Heart of the Earth at the very bottom!",
+    "Every $500 of ore you sell puts 1 chip in your Chip Bank. Find the Heart of the Earth, then keep going: "
+    "the ground never ends.",
 ]
 
 HOW_TO_SLOTS = [

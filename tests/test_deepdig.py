@@ -7,8 +7,8 @@ import pygame
 import pytest
 
 from ten_phases.deepdig import engine as dd
-from ten_phases.deepdig.engine import (AIR, BEDROCK, CORE, DIRT, GAS, HALF, LAVA, ORE0, ROCK, DeepDig, DigError,
-                                       generate)
+from ten_phases.deepdig.engine import (AIR, BEDROCK, CONCRETE, CORE, DIRT, GAS, HALF, LAVA, ORE0, ROCK, DeepDig,
+                                       DigError, generate, make_chunk)
 
 
 def fresh(seed=3):
@@ -34,8 +34,8 @@ def test_world_generation():
     a, b = generate(42), generate(42)
     assert a == b and generate(43) != a                  # the same seed makes the same world
     assert len(a) == dd.H and all(len(r) == dd.W for r in a)
-    assert all(t == BEDROCK for t in a[-1])
     assert sum(r.count(CORE) for r in a) == 1
+    assert a[dd.H - 3][dd.W // 2] == BEDROCK                          # the Heart sits on a bedrock plinth
     shallow = [t for r in a[1:60] for t in r]
     deep = [t for r in a[300:400] for t in r]
     assert dd.ORE0 in shallow and dd.ORE0 + 8 not in shallow            # diamonds aren't near the top
@@ -342,3 +342,150 @@ def test_the_screen_plays(app, tmp_path, monkeypatch):
     scene.draw(app.screen)
     from ten_phases.deepdig.save import load_game
     assert load_game().cash == g.cash                     # pausing saves
+
+
+def test_the_ground_goes_on_forever():
+    g = fresh(5)
+    assert len(g.grid) == dd.H
+    deep = g.tile(4, 3000)                                    # asking for a row makes it
+    assert len(g.grid) > 3000 and len(g.grid) % dd.CHUNK == 0 and deep != BEDROCK
+    c = 3000 // dd.CHUNK
+    assert g.grid[c * dd.CHUNK:(c + 1) * dd.CHUNK] == make_chunk(5, c)   # the same for a seed, whenever it's made
+    assert all(t not in (BEDROCK, CONCRETE) for r in g.grid[dd.H:] for t in r)    # nothing blocks the way down
+    assert not any(CORE in r for r in g.grid[dd.H:])
+    below = [t for r in g.grid[900:1500] for t in r]
+    near = [t for r in g.grid[300:400] for t in r]
+    worth = lambda ts: sum(dd.tile_value(t) for t in ts)      # noqa: E731
+    assert worth(below) > worth(near)                         # richer the deeper you go
+    g.x, g.y = 10.5, 2000.6
+    for c in range(9, 13):
+        g.set_tile(c, 2000, AIR)
+    g.set_tile(10, 2001, DIRT)
+    g.drill = None
+    g.levels["RADIATOR"] = 7
+    run(g, 2, down=True)
+    assert g.row >= 2001 and g.deepest >= 2001 and g.heat() > 1.0
+    check(g)
+
+
+def test_old_saves_still_load():
+    g = fresh(6)
+    d = g.to_dict()
+    grid = [list(r) for r in d["grid"]]
+    for row, r in enumerate(grid):                               # how v1 saved a world: core = 20, bedrock floor
+        grid[row] = [chr(48 + 20) if ch == chr(48 + CORE) else chr(48 + DIRT) if ord(ch) - 48 >= 20 else ch
+                     for ch in r]                              # (v1 had no ores past 19)
+    for row in range(dd.H - 3, dd.H):
+        grid[row] = [chr(48 + BEDROCK)] * dd.W
+    old = {**d, "v": 1, "grid": ["".join(r) for r in grid], "cargo": [20, ORE0 + 2]}
+    h = DeepDig.from_dict(old)
+    assert h.cargo == [CORE, ORE0 + 2]
+    assert sum(r.count(CORE) for r in h.grid) == 1
+    assert h.grid[dd.H - 1] == [DIRT] * dd.W and h.grid[dd.H - 3][dd.W // 2] == BEDROCK
+    assert h.tile(3, dd.H + 5) is not None and len(h.grid) > dd.H        # and it carries on below
+    new = DeepDig.from_dict(h.to_dict())
+    assert new.grid == h.grid and new.cargo == h.cargo
+
+
+def test_new_upgrades_and_ores():
+    assert len(dd.ORES) == 17 and len({o.name for o in dd.ORES}) == 17
+    assert all(dd.is_ore(ORE0 + k) for k in range(17)) and dd.is_ore(CORE) and not dd.is_ore(ORE0 + 17)
+    for name, (values, prices) in dd.UPGRADES.items():
+        assert len(values) == len(prices) == 8 and list(prices) == sorted(prices)
+        for lvl in range(8):
+            assert dd.upgrade_text(name, lvl)
+    g = fresh()
+    g.x, g.y = 10.5, 30.6
+    for r in range(18, 31):
+        for c in range(9, 13):
+            g.set_tile(c, r, AIR)
+    for c in range(9, 13):
+        g.set_tile(c, 31, ROCK)
+    g.y, g.vy, g.grounded = 18.6, 0.0, False
+    run(g, 2)
+    soft = fresh()
+    soft.grid = [r[:] for r in g.grid]
+    soft.levels["SHOCKS"] = 7
+    assert g.hull < g.max_hull                                 # a long fall dents the hull...
+    soft.x, soft.y, soft.vy, soft.grounded = 10.5, 18.6, 0.0, False
+    run(soft, 2)
+    assert soft.hull == soft.max_hull                          # ...but not with the best shocks
+
+
+def test_bug_fixes():
+    g = fresh()
+    # The world's edge is a wall, not a rock to blast.
+    g.x, g.y = dd.W - HALF, 5.6
+    for c in range(dd.W - 2, dd.W):
+        g.set_tile(c, 5, AIR)
+        g.set_tile(c, 6, DIRT)
+    g.pop_events()
+    run(g, 0.5, right=True)
+    assert not any(e[0] == "rock" for e in g.pop_events())
+    # Broke with $1 and an empty tank: the station's free fuel, as the button says.
+    h = fresh()
+    h.cash, h.fuel = 1, 0.5
+    h.x, h.y = 4.0, -HALF
+    assert h.emergency_fuel()
+    assert h.refuel() == 0 and h.cash == 1 and h.fuel >= 0.3 * h.max_fuel
+    # A slow frame is played in small steps: same place as many small ones.
+    a, b = fresh(), fresh()
+    a.step(0.2, right=True)
+    for _ in range(6):
+        b.step(1 / 30, right=True)
+    assert abs(a.x - b.x) < 1e-9
+
+
+def test_leaving_saves_and_starting_over_does_not(app, tmp_path, monkeypatch):
+    from ten_phases import settings
+    from ten_phases.deepdig import save
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    from ten_phases.ui.menus import MenuScene
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
+    scene = DeepDigScene(app, DeepDig(seed=2))
+    app.go(scene)
+    scene.game.cash = 4321
+    app.go(MenuScene(app))                                     # closing the window does the same
+    assert save.load_game().cash == 4321
+    scene = DeepDigScene(app)
+    app.go(scene)
+    scene.game.cash = 99
+    scene.new_game()
+    assert save.load_game() is None or save.load_game().cash != 99
+    # Losing focus lets go of the keys and pauses.
+    scene = app.scene
+    scene.splash = None
+    scene.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP, mod=0, unicode=""))
+    scene.handle(pygame.event.Event(pygame.WINDOWFOCUSLOST))
+    assert not scene.keys and scene.overlay == "pause"
+
+
+def test_deep_screens_draw(app, tmp_path, monkeypatch):
+    from ten_phases import settings
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
+    g = DeepDig(seed=4)
+    g.levels.update({"SCANNER": 7, "LAMP": 7, "RADIATOR": 7, "HULL": 7})
+    g.hull = g.max_hull
+    scene = DeepDigScene(app, g)
+    app.go(scene)
+    scene.splash = None
+    for depth in (30, 300, dd.H - 4, 1200):
+        g.drill = None
+        g.x, g.y = dd.W // 2 + 0.5, depth + 0.6
+        for c in range(dd.W // 2 - 1, dd.W // 2 + 2):
+            g.set_tile(c, depth, AIR)
+        scene.cam = [g.x * 40 - 640, g.y * 40 - 300]
+        scene.update(1 / 30)
+        scene.draw(app.screen)
+    g.cargo = [ORE0 + k for k in range(8)]
+    g.x, g.y, g.vx, g.vy, g.drill = 12.5, -HALF, 0.0, 0.0, None
+    scene.update(1 / 30)
+    scene.use_building()
+    scene.draw(app.screen)                                      # 8 kinds of ore: the list fits
+    scene.close_panel()
+    g.x, g.cash = 21.5, 10 ** 7
+    scene.update(1 / 30)
+    scene.use_building()
+    scene.draw(app.screen)
+    assert scene.panel == "SHOP" and len(scene.panel_buttons) == len(dd.UPGRADES) + len(dd.ITEMS) + 1

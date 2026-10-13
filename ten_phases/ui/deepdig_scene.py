@@ -13,7 +13,7 @@ import pygame
 
 from ..deepdig import engine as dd
 from ..deepdig.engine import (BUILDINGS, FEET_PER_ROW, ITEM_KEYS, ITEMS, UPGRADE_INFO, UPGRADES, W, DeepDig,
-                              DigError, tile_name, tile_value)
+                              DigError, tile_name, tile_value, upgrade_text)
 from ..deepdig.save import delete_save, load_game, save_game
 from . import deepdig_art as art
 from . import sfx, theme
@@ -55,6 +55,7 @@ class DeepDigScene(Scene):
         self.panel_buttons: list[Button] = []
         self.overlay_buttons: list[Button] = []
         self.save_timer = 0.0
+        self.discarded = False              # set when starting over, so leaving doesn't save the old dig
         self.spin = 0.0
         self.splash: tuple | None = ("DEEP DIG", "WELCOME BACK!" if not self.fresh else "DIG DOWN, FIND ORE, GET RICH",
                                      1.8, 1.8)
@@ -93,8 +94,13 @@ class DeepDigScene(Scene):
         self.floaters.append([text, wx, wy, 1.6, color or theme.ACCENT])
 
     def save(self):
-        save_game(self.game)
+        if not self.discarded:
+            save_game(self.game)
         self.save_timer = 0.0
+
+    def on_leave(self):
+        """The app calls this when you leave the screen or close the window."""
+        self.save()
 
     # ================================================================== actions
 
@@ -140,7 +146,7 @@ class DeepDigScene(Scene):
         if self.panel == "FUEL":
             cost = g.refuel_cost()
             label = f"FILL UP  {money(cost)}" if cost else "TANK FULL"
-            if cost and g.cash < dd.FUEL_PRICE and g.fuel < 0.25 * g.max_fuel:
+            if cost and g.emergency_fuel():
                 label = "FREE EMERGENCY FUEL"
             b = Button((p.centerx - 170, p.bottom - 150, 340, 64), label,
                        lambda: self._do(g.refuel), size=22, **primary)
@@ -162,8 +168,8 @@ class DeepDigScene(Scene):
             for k, name in enumerate(UPGRADES):
                 price = g.upgrade_price(name)
                 r = self.shop_row(k)
-                b = Button((r.right - 170, r.y + 10, 160, 48), "MAXED" if price is None else money(price),
-                           lambda n=name: self._do(g.buy_upgrade, n), size=17,
+                b = Button((r.right - 150, r.y + 7, 140, 40), "MAXED" if price is None else money(price),
+                           lambda n=name: self._do(g.buy_upgrade, n), size=16,
                            **(primary if price is not None and g.cash >= price else {}))
                 b.enabled = price is not None and g.cash >= price
                 out.append(b)
@@ -184,7 +190,7 @@ class DeepDigScene(Scene):
 
     def shop_row(self, k: int) -> pygame.Rect:
         p = self.panel_rect()
-        return pygame.Rect(p.x + 24, p.y + 92 + k * 86, 640, 76)
+        return pygame.Rect(p.x + 24, p.y + 88 + k * 59, 640, 54)
 
     def item_row(self, k: int) -> pygame.Rect:
         p = self.panel_rect()
@@ -215,6 +221,7 @@ class DeepDigScene(Scene):
             self.overlay_buttons = []
 
     def new_game(self):
+        self.discarded = True
         delete_save()
         self.app.go(DeepDigScene(self.app, DeepDig()))
 
@@ -226,6 +233,11 @@ class DeepDigScene(Scene):
     # ================================================================== input
 
     def handle(self, event):
+        if event.type == getattr(pygame, "WINDOWFOCUSLOST", -1):
+            self.keys.clear()          # the key-up events go to another window: don't keep flying
+            if not self.overlay and not self.panel:
+                self._set_overlay("pause")
+            return
         if self.overlay:
             for b in self.overlay_buttons:
                 if b.handle(event):
@@ -287,7 +299,7 @@ class DeepDigScene(Scene):
         self.cam[0] += (tx - self.cam[0]) * k
         self.cam[1] += (ty - self.cam[1]) * k
         self.cam[0] = max(0, min(W * TILE - VIEW.w, self.cam[0]))
-        self.cam[1] = max(-9 * TILE, min(dd.H * TILE - VIEW.h, self.cam[1]))
+        self.cam[1] = max(-9 * TILE, self.cam[1])          # no bottom: the ground goes on forever
         for p in self.particles:
             p[0] += p[2] * dt
             p[1] += p[3] * dt
@@ -439,7 +451,8 @@ class DeepDigScene(Scene):
         c0 = max(0, int(cam_x // TILE))
         c1 = min(W - 1, int((cam_x + VIEW.w) // TILE) + 1)
         r0 = max(0, int(cam_y // TILE))
-        r1 = min(dd.H - 1, int((cam_y + VIEW.h) // TILE) + 1)
+        r1 = int((cam_y + VIEW.h) // TILE) + 1
+        g.tile(0, r1)                                       # make sure the ground in view exists
         for row in range(r0, r1 + 1):
             line = g.grid[row]
             for col in range(c0, c1 + 1):
@@ -457,7 +470,8 @@ class DeepDigScene(Scene):
         drilling = None
         if d:
             drilling = "down" if d.row > g.y + 0.2 else ("right" if d.col > g.x else "left")
-        img = art.pod(g.facing, drilling, self.spin, g.thrusting, self.clock, self.hurt_flash)
+        img = art.pod(g.facing, drilling, self.spin, g.thrusting, self.clock, self.hurt_flash,
+                      drill_level=g.levels["DRILL"])
         x, y = self.to_screen(g.x * TILE, g.y * TILE)
         jitter = (random.uniform(-1.5, 1.5) if d else 0)
         surf.blit(img, img.get_rect(center=(x + jitter, y - 2)))
@@ -482,19 +496,48 @@ class DeepDigScene(Scene):
             return
         dark = pygame.Surface(VIEW.size, pygame.SRCALPHA)
         dark.fill((0, 0, 8, alpha))
-        radius = 300
+        radius = int(g.stat("LAMP") * TILE)
         hole = art.light_hole(radius)
         x, y = self.to_screen(g.x * TILE, g.y * TILE)
         dark.blit(hole, (x - radius - VIEW.x, y - radius - VIEW.y), special_flags=pygame.BLEND_RGBA_MIN)
         surf.blit(dark, VIEW.topleft)
+        self._draw_scanner(surf, alpha / 255)
         if g.heat() > 0:   # a red haze when it's hot
             haze = pygame.Surface(VIEW.size, pygame.SRCALPHA)
-            haze.fill((255, 60, 0, int(60 * g.heat())))
+            haze.fill((255, 60, 0, int(60 * min(1.0, g.heat()))))
             surf.blit(haze, VIEW.topleft)
         if self.hurt_flash > 0:
             red = pygame.Surface(VIEW.size, pygame.SRCALPHA)
             red.fill((255, 0, 0, int(120 * self.hurt_flash)))
             surf.blit(red, VIEW.topleft)
+
+    def _draw_scanner(self, surf, darkness: float):
+        """The scanner marks ore hidden in the dark: a pulsing box in the ore's colour, fading in where it's dark."""
+        g = self.game
+        reach = g.stat("SCANNER")
+        if not reach or darkness < 0.2:
+            return
+        lamp = g.stat("LAMP")
+        pulse = 0.5 + 0.5 * math.sin(self.clock * 5)
+        layer = pygame.Surface(VIEW.size, pygame.SRCALPHA)
+        cx, cy = int(g.x), int(g.y)
+        for row in range(max(0, cy - reach), cy + reach + 1):
+            for col in range(max(0, cx - reach), min(W - 1, cx + reach) + 1):
+                t = g.tile(col, row)
+                dist2 = (col + 0.5 - g.x) ** 2 + (row + 0.5 - g.y) ** 2
+                if not dd.is_ore(t) or dist2 > reach * reach:
+                    continue
+                dark_here = darkness * min(1.0, (math.sqrt(dist2) / lamp) ** 1.6)   # as dark as the lamp leaves it
+                if dark_here < 0.25:
+                    continue
+                color = (255, 120, 220) if t == dd.CORE else dd.ore_of(t).color
+                a = int(255 * min(1.0, dark_here * 1.4))
+                x, y = self.to_screen(col * TILE, row * TILE)
+                r = pygame.Rect(x - VIEW.x + 6, y - VIEW.y + 6, TILE - 12, TILE - 12).inflate(int(pulse * 6),
+                                                                                              int(pulse * 6))
+                pygame.draw.rect(layer, (*color, a), r, 2, border_radius=6)
+                pygame.draw.circle(layer, (*color, a), r.center, 4)
+        surf.blit(layer, VIEW.topleft)
 
     def _gauge(self, surf, x, label, value, maximum, color, low_color):
         theme.ptext(surf, label, (x, 8), 12, theme.TEXT_DIM)
@@ -569,12 +612,20 @@ class DeepDigScene(Scene):
             if not counts:
                 theme.ptext(surf, "Your hold is empty. Go dig!", (p.centerx, p.y + 200), 20, theme.TEXT_DIM,
                             anchor="center")
-            for t, n in sorted(counts.items(), key=lambda kv: -tile_value(kv[0]))[:6]:
+            kinds = sorted(counts.items(), key=lambda kv: -tile_value(kv[0]))
+            shown = kinds if len(kinds) <= 6 else kinds[:5]
+            for t, n in shown:
                 img = art.tile_surface(t, 100, 3)
                 surf.blit(img, (p.x + 40, y))
                 theme.ptext(surf, f"{tile_name(t)} x{n}", (p.x + 96, y + 8), 20)
                 theme.ptext(surf, money(tile_value(t) * n), (p.right - 40, y + 8), 20, theme.SUCCESS, anchor="topright")
                 y += 46
+            if len(shown) < len(kinds):              # the rest on one line
+                rest = kinds[len(shown):]
+                theme.ptext(surf, f"+ {sum(n for _, n in rest)} MORE ({len(rest)} KINDS)", (p.x + 96, y + 8), 18,
+                            theme.TEXT_DIM)
+                theme.ptext(surf, money(sum(tile_value(t) * n for t, n in rest)), (p.right - 40, y + 8), 18,
+                            theme.SUCCESS, anchor="topright")
             theme.ptext(surf, f"Every {money(dd.CHIP_EVERY)} sold = 1 chip for your Chip Bank", (p.centerx, p.bottom - 60),
                         14, theme.TEXT_DIM, anchor="center")
         elif self.panel == "SHOP":
@@ -583,14 +634,17 @@ class DeepDigScene(Scene):
             for k, name in enumerate(UPGRADES):
                 r = self.shop_row(k)
                 theme.rounded(surf, theme.INNER, r, 10)
-                theme.ptext(surf, name, (r.x + 16, r.y + 10), 20)
-                theme.text(surf, UPGRADE_INFO[name], (r.x + 16, r.y + 42), 13, theme.TEXT_DIM, bold=False)
+                theme.ptext(surf, name, (r.x + 14, r.y + 7), 17)
+                theme.text(surf, UPGRADE_INFO[name], (r.x + 14, r.y + 31), 12, theme.TEXT_DIM, bold=False)
                 lvl = g.levels[name]
                 for n in range(1, len(UPGRADES[name][0])):
-                    pip = pygame.Rect(r.x + 300 + n * 26, r.y + 18, 20, 20)
-                    pygame.draw.rect(surf, theme.ACCENT if n <= lvl else theme.PANEL, pip, border_radius=5)
-                    pygame.draw.rect(surf, theme.OUTLINE, pip, 2, border_radius=5)
-                theme.ptext(surf, f"LEVEL {lvl}", (r.x + 330, r.y + 46), 12, theme.TEXT_DIM)
+                    pip = pygame.Rect(r.x + 214 + n * 20, r.y + 9, 15, 15)
+                    pygame.draw.rect(surf, theme.ACCENT if n <= lvl else theme.PANEL, pip, border_radius=4)
+                    pygame.draw.rect(surf, theme.OUTLINE, pip, 2, border_radius=4)
+                now = upgrade_text(name, lvl)
+                nxt = upgrade_text(name, lvl + 1) if lvl + 1 < len(UPGRADES[name][0]) else None
+                theme.ptext(surf, f"{now}  >  {nxt}" if nxt else f"{now}  (BEST)", (r.x + 234, r.y + 32), 12,
+                            theme.TEXT if nxt else theme.TEXT_DIM)
             for k, name in enumerate(ITEM_KEYS):
                 r = self.item_row(k)
                 theme.rounded(surf, theme.INNER, r, 10)
@@ -641,6 +695,8 @@ class DeepDigScene(Scene):
             theme.logo(surf, "YOU DID IT!", (cx, 230), 60, angle=4)
             theme.ptext(surf, "You found the HEART OF THE EARTH!", (cx, 320), 26, theme.ACCENT, anchor="center")
             theme.ptext(surf, f"Sell it at the Ore Buyer for {money(dd.CORE_VALUE)}.", (cx, 370), 20, anchor="center")
+            theme.ptext(surf, "The ground goes on forever below, richer and hotter. How deep can you go?", (cx, 470),
+                        16, theme.TEXT_DIM, anchor="center")
             theme.ptext(surf, f"Total earned so far: {money(g.earned)}", (cx, 420), 18, theme.TEXT_DIM, anchor="center")
         for b in self.overlay_buttons:
             b.draw(surf)

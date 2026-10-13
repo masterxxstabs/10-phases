@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.15.0
+
+- Deep Dig goes on forever: dig past the Heart of the Earth and the ground keeps coming, with richer ore and more heat the deeper you go
+- 7 new ores (coal, quartz, amber, titanium, amethyst, sapphire and meteorites) and 3 new upgrades: shocks, a brighter lamp and an ore scanner that spots ore in the dark. Every upgrade now has 7 levels, and the shop shows what the next one does
+- A new, more detailed drill pod: a pilot in a glass cab, rolling tracks, a headlamp, a blinking antenna, and a drill bit that changes as you upgrade it
+- Fixes: your dig saves when you close the window, keys no longer get stuck when you click away (the game pauses), free emergency fuel works when you have $1, smoother play on slow computers, and no "blow it up" hint at the edge of the world. Old saves carry on
+
 ## 1.14.0
 
 - New game: Deep Dig! Drill down through the earth, collect ore, sell it in town and buy upgrades to dig deeper (single player, inspired by Motherload)
