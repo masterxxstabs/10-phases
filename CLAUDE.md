@@ -6,7 +6,9 @@
   network multiplayer (host/join via invite code, nearby games, lobby, computer
   players filling seats) from the start, the same way 10 Phases and Go Fish do,
   unless the owner explicitly says otherwise for that game.
-  - Exception the owner asked for: **Slots is single player** (it bets the real Chip Bank).
+  - Exceptions the owner asked for: **Slots is single player** (it bets the real Chip Bank), and so is
+    **Deep Dig** (`deepdig/engine.py` rules, `deepdig/save.py` its saved game, `ui/deepdig_scene.py`,
+    `ui/deepdig_art.py`; inspired by Motherload, our own code and art).
     Single-player games go in `SINGLE_PLAYER` in `ui/menus.py`.
 
 ## How the project fits together

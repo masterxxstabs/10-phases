@@ -132,9 +132,10 @@ def smoke_test() -> None:
     from .shop_scene import ShopScene
     from .slots_scene import SlotsScene
     pulls = shop.open_pack(shop.PACK_BY_ID["legendary"], set())   # just for show: nothing is saved
+    from .deepdig_scene import DeepDigScene
     from .profile_scene import ProfileScene
     for scene in (ShopScene(app), ShopScene(app, tab="CARD BACKS"), ShopScene(app, tab="PICTURES"), SlotsScene(app),
-                  ProfileScene(app),
+                  ProfileScene(app), DeepDigScene(app),
                   PackOpenScene(app, "legendary", pulls)):
         app.running = True
         app.go(scene)

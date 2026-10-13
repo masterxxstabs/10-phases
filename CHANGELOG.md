@@ -4,6 +4,12 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.14.0
+
+- New game: Deep Dig! Drill down through the earth, collect ore, sell it in town and buy upgrades to dig deeper (single player, inspired by Motherload)
+- Dodge gas pockets, lava, boulders and the heat far below, use dynamite and teleporters, and find the Heart of the Earth at the very bottom
+- Every $500 of ore you sell adds a chip to your Chip Bank, and your dig saves itself so you can carry on later
+
 ## 1.13.0
 
 - Poker: queue your move while others play (CHECK / FOLD, CHECK or CALL ANY), and it happens the moment your turn comes

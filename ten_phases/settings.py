@@ -112,7 +112,7 @@ class Settings:
         for attr, kind in (("face_style", "face"), ("back_style", "back")):
             if f"{kind}:{getattr(s, attr)}" not in s.owned_items:
                 setattr(s, attr, "classic")
-        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "SLOTS"):
+        if s.game not in ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "DEEP DIG", "SLOTS"):
             s.game = "10 PHASES"
         s.opponents = max(1, min(5, s.opponents))
         s.chip_bank = max(0, s.chip_bank)

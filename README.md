@@ -232,6 +232,15 @@ Click your profile card on the main menu (under the SHOP button) to open **PROFI
 - The developer (name: Shawn) gets a black **DEV** tag next to their name.
 - In multiplayer everyone sees each other's picture, background, name colour and level (everyone needs this version to play together). Computer players get their own.
 
+## Deep Dig
+
+**DEEP DIG** is a mining game on the main menu, inspired by the classic Flash game *Motherload* (it's our own version, written from scratch; no code or art from the original). Like Slots it's **single player**, and your game saves itself so you can carry on later.
+- **Digging:** arrows or WASD. Press down to drill down, push into a wall to drill sideways, and press up to fly (that burns fuel). Grey boulders are too hard to drill: go around them or blow them up.
+- **Town:** park in front of a building and press **E**. The fuel station fills your tank, the ore buyer pays cash for your cargo, the shop sells upgrades (drill, hull, engine, fuel tank, cargo hold, radiator) and items, and the repair shop fixes your hull.
+- **Danger:** gas pockets explode, lava burns, falling too far dents the hull, and deep down the heat wears the hull away unless you have a radiator. Run out of fuel or hull underground and you're towed home for a fee, and your cargo is lost.
+- **Items (keys 1-5):** repair kit, fuel can, dynamite, mega blast and teleporter.
+- **Chips:** every $500 of ore you sell adds 1 chip to your Chip Bank. Somewhere at the very bottom waits the Heart of the Earth.
+
 ## Slots
 
 **LUCKY 10 SLOTS** is the 4th stop on the main menu. Unlike the other games it's **single player** on purpose, and it plays with your real Chip Bank:
@@ -332,6 +341,7 @@ ten_phases/
   poker/        Texas Hold'em rules, hand ranking and side pots (engine.py), computer players and the Hint (ai.py)
   cah/          Cards Against Humanity: card download and cache (cards.py), rules (engine.py), computers (ai.py)
   monopoly/     Monopoly: the board and cards (board.py), rules (engine.py), computer players (ai.py)
+  deepdig/      Deep Dig: the world, the pod's physics, drilling and shops (engine.py), the saved game (save.py)
   slots/        the slot machine: reels, payouts and its exact return-to-player (engine.py)
   skins.py      every card skin and its rarity, including the generated ones
   shop.py       card packs (odds, opening, duplicates) and equipping skins

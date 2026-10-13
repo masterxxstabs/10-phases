@@ -44,9 +44,9 @@ def status_bar(surf, msg: str):
 
 
 UPDATE_CARD = pygame.Rect(896, 500, 364, 220)
-GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "SLOTS")
+GAMES = ("10 PHASES", "GO FISH", "BLACKJACK", "POKER", "CAH", "MONOPOLY", "DEEP DIG", "SLOTS")
 TITLES = {"CAH": "CARDS AGAINST HUMANITY"}
-SINGLE_PLAYER = ("SLOTS",)
+SINGLE_PLAYER = ("SLOTS", "DEEP DIG")
 ARROW_LEFT = pygame.Rect(278, 236, 76, 96)
 PROFILE_CARD = pygame.Rect(20, 162, 250, 104)
 ARROW_RIGHT = pygame.Rect(926, 236, 76, 96)
@@ -80,7 +80,7 @@ class MenuScene(Scene):
 
     def _build_fan(self):
         rng = random.Random()
-        if self.game in ("CAH", "MONOPOLY"):
+        if self.game in ("CAH", "MONOPOLY", "DEEP DIG"):
             self.fan = []   # drawn in draw()
         elif self.game == "SLOTS":
             self.fan = [None, None, None]   # three jackpot card backs
@@ -140,7 +140,10 @@ class MenuScene(Scene):
         self.app.go(ProfileScene(self.app))
 
     def _play(self):
-        if self.game == "MONOPOLY":
+        if self.game == "DEEP DIG":
+            from .deepdig_scene import DeepDigScene
+            self.app.go(DeepDigScene(self.app))
+        elif self.game == "MONOPOLY":
             from .monopoly_setup import MonopolySetupScene
             self.app.go(MonopolySetupScene(self.app))
         elif self.game == "CAH":
@@ -257,6 +260,8 @@ class MenuScene(Scene):
                 surf.blit(img, img.get_rect(center=(cx + (i - 1) * 120, 276 + abs(i - 1) * 8)))
         if self.game == "MONOPOLY":
             _draw_monopoly_fan(surf, cx, 276, self.clock)
+        elif self.game == "DEEP DIG":
+            _draw_deepdig_fan(surf, cx, 276, self.clock)
         title = TITLES.get(self.game, self.game)
         theme.logo(surf, title, (cx + (40 if len(title) >= 14 else 0), 120), 92 if len(title) < 14 else 46,
                    angle=6 if len(title) < 14 else 3)
@@ -438,6 +443,19 @@ HOW_TO_MONOPOLY = [
     "Every £50 you're worth at the end is 1 chip for your CHIP BANK. Hold SPACE to speed things up.",
 ]
 
+HOW_TO_DEEPDIG = [
+    "Fly your drill pod into the ground and dig for ore. Arrows or WASD: Down drills, Left/Right drill into walls, "
+    "Up fires the thrusters.",
+    "Ore gets rarer and worth more the deeper you go: iron and copper near the top, then silver, gold, platinum, "
+    "uranium, emeralds, rubies, diamonds and ancient relics.",
+    "Watch your FUEL and HULL. Run out underground and you're towed up for a fee, and your cargo is lost.",
+    "Fly back up and park at a building, then press E: sell ore at the Ore Buyer, refuel, repair, or buy upgrades.",
+    "Upgrade your drill, hull, engine, fuel tank, cargo bay and radiator (it gets hot down there).",
+    "Watch out for gas pockets, lava, grey boulders you can't drill (blast them with dynamite) and long falls.",
+    "Items, keys 1-5: repair kit, fuel can, dynamite, mega blast and a teleporter home.",
+    "Every $500 of ore you sell puts 1 chip in your Chip Bank. Find the Heart of the Earth at the very bottom!",
+]
+
 HOW_TO_SLOTS = [
     "Slots plays with your real CHIP BANK: every spin costs your bet, and wins go straight back in.",
     "Pick a bet (1, 5, 10 or 25), then pull the lever, press SPIN or hit Space.",
@@ -479,14 +497,15 @@ class HowToScene(Scene):
     def draw(self, surf):
         backdrop(surf, self.clock)
         title = {"GO FISH": "GO FISH RULES", "BLACKJACK": "BLACKJACK RULES", "SLOTS": "SLOTS RULES",
-                 "POKER": "POKER RULES", "CAH": "CARDS AGAINST HUMANITY", "MONOPOLY": "MONOPOLY RULES"}.get(
+                 "POKER": "POKER RULES", "CAH": "CARDS AGAINST HUMANITY", "MONOPOLY": "MONOPOLY RULES", "DEEP DIG": "DEEP DIG"}.get(
             self.game, "HOW TO PLAY")
         theme.logo(surf, title, (theme.WIDTH // 2, 64), 50, angle=4)
         left = pygame.Rect(40, 120, 720, 550)
         theme.panel(surf, left)
         y = left.y + 20
         rules = {"GO FISH": HOW_TO_FISH, "BLACKJACK": HOW_TO_BLACKJACK, "SLOTS": HOW_TO_SLOTS, "POKER": HOW_TO_POKER,
-                 "CAH": HOW_TO_CAH, "MONOPOLY": HOW_TO_MONOPOLY}
+                 "CAH": HOW_TO_CAH, "MONOPOLY": HOW_TO_MONOPOLY,
+                 "DEEP DIG": HOW_TO_DEEPDIG}
         for line in rules.get(self.game, HOW_TO):
             theme.star(surf, (left.x + 24, y + 10), 9, theme.ACCENT)
             for chunk in _wrap(line, 17, left.w - 70):
@@ -518,6 +537,11 @@ class HowToScene(Scene):
             _draw_cah_panel(surf, panel)
             self.back.draw(surf)
             status_bar(surf, f"Cards Against Humanity  -  10 Phases v{__version__}")
+            return
+        if self.game == "DEEP DIG":
+            _draw_deepdig_panel(surf, panel, self.clock)
+            self.back.draw(surf)
+            status_bar(surf, f"Deep Dig  -  10 Phases v{__version__}")
             return
         if self.game == "MONOPOLY":
             _draw_monopoly_panel(surf, panel, self.clock)
@@ -575,6 +599,36 @@ def _draw_blackjack_panel(surf, panel):
         theme.ptext(surf, head, (panel.x + 24, panel.y + 260 + k * 70), 18, theme.ACCENT)
         theme.ptext(surf, line, (panel.x + 24, panel.y + 290 + k * 70), 15, theme.TEXT_DIM)
     theme.logo(surf, "21!", (panel.centerx, panel.bottom - 50), 52, angle=6)
+
+
+def _draw_deepdig_fan(surf, cx, cy, clock):
+    """A slice of ground with ore and the drill pod digging in."""
+    from ..deepdig.engine import CORE, DIRT, ORE0, ROCK
+    from . import deepdig_art as art
+    tiles = [DIRT, ORE0 + 3, DIRT, ROCK, ORE0 + 8, DIRT, ORE0 + 6, DIRT, CORE]
+    for k, t in enumerate(tiles):
+        col = k % 9
+        x = cx - 4.5 * 52 + col * 52
+        img = pygame.transform.smoothscale(art.tile_surface(t, 260 if t != DIRT else 120, col), (52, 52))
+        surf.blit(img, (x, cy + 10))
+        img2 = pygame.transform.smoothscale(art.tile_surface(DIRT, 200, col + 3), (52, 52))
+        surf.blit(img2, (x, cy + 62))
+    pod = art.pod(1, "down", clock * 3, False, clock, 0, 44)
+    surf.blit(pod, pod.get_rect(center=(cx - 20, cy - 26 + int(math.sin(clock * 6) * 3))))
+
+
+def _draw_deepdig_panel(surf, panel, clock):
+    from ..deepdig.engine import ORES
+    from . import deepdig_art as art
+    theme.ptext(surf, "ORE VALUES", (panel.x + 24, panel.y + 18), 22, theme.ACCENT)
+    for k, ore in enumerate(ORES):
+        y = panel.y + 58 + k * 44
+        img = pygame.transform.smoothscale(art.tile_surface(10 + k, ore.peak, 2), (36, 36))
+        surf.blit(img, (panel.x + 24, y))
+        theme.ptext(surf, ore.name, (panel.x + 72, y + 8), 18)
+        theme.ptext(surf, f"${ore.value:,}", (panel.right - 30, y + 8), 18, theme.SUCCESS, anchor="topright")
+    theme.ptext(surf, "Single player - your game is saved as you play", (panel.centerx, panel.bottom - 30), 13,
+                theme.TEXT_DIM, anchor="center")
 
 
 def _draw_monopoly_fan(surf, cx, cy, clock):

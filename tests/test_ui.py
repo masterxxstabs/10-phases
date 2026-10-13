@@ -300,6 +300,7 @@ def test_random_clicking_never_crashes_any_screen(app):
 
     from ten_phases.ui.blackjack_scene import BlackjackScene
     from ten_phases.ui.customize import CustomizeScene
+    from ten_phases.ui.deepdig_scene import DeepDigScene
     from ten_phases.ui.gofish_scene import GoFishScene
     from ten_phases.ui.menus import HowToScene, MenuScene, SettingsScene
     from ten_phases.ui.pack_open import PackOpenScene
@@ -326,8 +327,10 @@ def test_random_clicking_never_crashes_any_screen(app):
               lambda: SettingsScene(app), lambda: CustomizeScene(app), lambda: HowToScene(app, "GO FISH"),
               lambda: PackOpenScene(app, "premium", shop.open_pack(shop.PACK_BY_ID["premium"], set(), rng)),
               lambda: MonopolyScene(app), lambda: MonopolySetupScene(app), lambda: HowToScene(app, "MONOPOLY"),
-              lambda: ProfileScene(app), lambda: ShopScene(app, tab="PICTURES"), lambda: ShopScene(app, tab="BACKGROUNDS")]
-    keys = [pygame.K_SPACE, pygame.K_RETURN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_1]
+              lambda: ProfileScene(app), lambda: ShopScene(app, tab="PICTURES"), lambda: ShopScene(app, tab="BACKGROUNDS"),
+              lambda: DeepDigScene(app), lambda: HowToScene(app, "DEEP DIG")]
+    keys = [pygame.K_SPACE, pygame.K_RETURN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_a, pygame.K_1, pygame.K_DOWN,
+            pygame.K_e, pygame.K_ESCAPE]
     for make in makers:
         app.settings.chip_bank = 1000
         scene = make()
