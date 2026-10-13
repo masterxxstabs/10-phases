@@ -26,6 +26,8 @@ class App:
         self.fullscreen = False
         self._open_window(self.settings.fullscreen)
         self.clock = pygame.time.Clock()
+        from .gamepad import Gamepad
+        self.pad = Gamepad(self)
         sfx.init(self.settings.sfx)
         theme.apply(self.settings)
         self.updater = updater.Updater()
@@ -106,9 +108,13 @@ class App:
                 elif self._is_fullscreen_key(event):
                     self.set_fullscreen(not self.fullscreen)
                 else:
-                    self.scene.handle(event)
+                    for e in self.pad.translate(event):     # a controller acts as the mouse and keys
+                        self.scene.handle(e)
+            for e in self.pad.update(dt):
+                self.scene.handle(e)
             self.scene.update(dt)
             self.scene.draw(self.screen)
+            self.pad.draw(self.screen)
             pygame.display.flip()
 
 
@@ -131,6 +137,9 @@ def smoke_test() -> None:
     app = App(check_updates=False)
     if theme._pixel_font(20) is None:
         raise SystemExit("smoke test: the bundled pixel font is missing")
+    from .gamepad import sdl_controller
+    if sdl_controller is None:
+        raise SystemExit("smoke test: controller support (pygame._sdl2.controller) is missing")
     app.run(max_frames=30)
     app.running = True
     app.go(GameScene(app))

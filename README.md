@@ -308,6 +308,28 @@ Hover over any player's box to open their info card:
 
 Penalty points for cards left in hand: 1–9 = 5, 10–12 = 10, Skip = 15, Wild = 25. The first player to complete phase 10 wins. If several players finish phase 10 in the same round, the lowest score wins, then the most chips.
 
+## Controllers
+
+Plug in a controller (Xbox, PlayStation, Switch Pro or any other pad your computer knows) and play any game with it. Every game supports controllers.
+
+| | Everywhere |
+|---|---|
+| Left stick | Move the pointer (it appears when you use the pad; touch the mouse to get it back) |
+| A | Click (hold A to drag, like the poker bet slider) |
+| B | Back (Escape) |
+| Start | Menu / pause |
+| D-pad | Arrow keys (switch games on the main menu, change your bet...) |
+| Right stick | Scroll |
+| X / Y | Space / Enter, unless the game below says otherwise |
+
+| Game | Extra buttons |
+|---|---|
+| 10 Phases | X draw, Y sort your hand |
+| Blackjack | X hit, Y stand, LB double, RB split, D-pad bet |
+| Poker | X check/call, Y raise, LB fold, D-pad bet size |
+| Monopoly | X roll / carry on |
+| Deep Dig | Stick or D-pad fly and drill, A use a building, LB/RB/X/LT/Y items 1-5, Start pause. In a shop the pointer comes back |
+
 ## Settings
 
 | Setting | Options |

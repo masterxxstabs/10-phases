@@ -47,6 +47,9 @@ class Bubble:
 
 class BlackjackScene(Scene):
     """Local by default; pass `host` + `session` to host a network game, or `client` to join one."""
+    # Controller: X hit, Y stand, LB double, RB split; the D-pad changes your bet (see gamepad.py).
+    pad_buttons = {"X": pygame.K_h, "Y": pygame.K_s, "LB": pygame.K_d, "RB": pygame.K_p}
+
 
     def __init__(self, app, host=None, session=None, client=None):
         super().__init__(app)

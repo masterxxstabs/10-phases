@@ -17,6 +17,18 @@
   the mouse). Fullscreen (`App.set_fullscreen`, F11, Alt+Enter, Settings > DISPLAY) toggles in place; never
   call `set_mode` again while running (it can leave a broken screen).
     Single-player games go in `SINGLE_PLAYER` in `ui/menus.py`.
+- **Every game gets controller support.** Any new game (and any new screen) must be fully playable with a
+  controller (Xbox, PlayStation, Switch Pro: anything SDL calls a game controller) from the start, no exceptions
+  unless the owner says so. It comes from `ui/gamepad.py`, which the app runs for every screen:
+  - Pointer screens work on their own: the left stick moves a pointer that `pygame.mouse.get_pos()` follows,
+    A clicks (hold to drag), the D-pad is the arrow keys, the right stick scrolls, B and Start are Escape.
+  - Give each table its shortcuts with a `pad_buttons` class attribute or property (button name -> pygame key,
+    or "click"; names A B X Y LB RB LT RT START BACK LS RS), like `BlackjackScene` (X hit, Y stand...).
+  - Action games set `pad_mode = "keys"` (a property can switch to "cursor" when a menu or shop is open), so the
+    stick and D-pad are held arrow keys: see `DeepDigScene.pad_mode` / `pad_buttons`.
+  - Anything you can only do by typing needs another way in, or a controller player gets stuck there.
+  - Add a test that plays the new game's main actions with fake controller events (see `tests/test_gamepad.py`),
+    and list its controls in the README's Controllers section.
 
 ## How the project fits together
 

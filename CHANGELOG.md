@@ -4,6 +4,13 @@ Each version's notes become its GitHub Release text, and the first few lines
 show on the in-game update card. Add a section here when you bump the version
 in `ten_phases/__init__.py`.
 
+## 1.17.0
+
+- Controller support for every game! Plug in an Xbox, PlayStation or Switch Pro controller (or most others)
+- The left stick moves a pointer and A clicks, B goes back, Start opens the menu, the D-pad works like the arrow keys and the right stick scrolls
+- Shortcuts at each table: X hit and Y stand in Blackjack, X check/call and Y raise in Poker, X draw in 10 Phases, X roll in Monopoly
+- Deep Dig plays like a console game: fly and drill with the stick, A to use a building, the bumpers and face buttons for items
+
 ## 1.16.0
 
 - Deep Dig: the town moved to its own spot left of the mine, on solid ground you can't dig, with a signpost pointing the way

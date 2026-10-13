@@ -82,6 +82,9 @@ class FlyingCard:
 class GameScene(Scene):
     """The table. Plays a local game by default; pass `host` + `session` to host a network game,
     or `client` to play in someone else's (the client's game mirror stands in for the engine)."""
+    # Controller: A clicks, X draws (Space), Y sorts your hand; the rest is the usual pointer (see gamepad.py).
+    pad_buttons = {"X": pygame.K_SPACE, "Y": pygame.K_s}
+
 
     def __init__(self, app, host=None, session=None, client=None):
         super().__init__(app)

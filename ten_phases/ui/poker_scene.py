@@ -72,6 +72,9 @@ class ChipFly:
 
 class PokerScene(Scene):
     """Local by default; pass `host` + `session` to host a network game, or `client` to join one."""
+    # Controller: X check/call, Y raise, LB fold; the D-pad sizes your bet (see gamepad.py).
+    pad_buttons = {"X": pygame.K_c, "Y": pygame.K_r, "LB": pygame.K_f}
+
 
     def __init__(self, app, host=None, session=None, client=None):
         super().__init__(app)

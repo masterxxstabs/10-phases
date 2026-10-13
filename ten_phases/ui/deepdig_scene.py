@@ -64,6 +64,20 @@ class DeepDigScene(Scene):
         self.flash = ("Arrows or WASD: fly and drill. Park at a building and press E.", 6.0) if self.fresh else None
         sfx.play("shuffle")
 
+    # ================================================================== controller
+
+    @property
+    def pad_mode(self) -> str:
+        """Flying and digging: the stick is the arrow keys. A shop or menu open: a pointer to click with."""
+        return "cursor" if (self.panel or self.overlay) else "keys"
+
+    @property
+    def pad_buttons(self) -> dict:
+        if self.panel or self.overlay:
+            return {}                     # A clicks, B / Start back out
+        return {"A": pygame.K_e, "LB": pygame.K_1, "RB": pygame.K_2, "X": pygame.K_3, "LT": pygame.K_4,
+                "Y": pygame.K_5, "B": None}
+
     # ================================================================== helpers
 
     @property
@@ -462,6 +476,8 @@ class DeepDigScene(Scene):
             return "Fuel is low! Head back up to the fuel station (or use a fuel can: key 2)."
         if g.hull < g.max_hull * 0.25:
             return "Hull damaged! Repair on the surface (or use a repair kit: key 1)."
+        if getattr(self.app, "pad", None) and self.app.pad.active:
+            return "Stick: fly and drill.  A: use a building.  LB RB X LT Y: items 1-5.  Start: menu."
         return "Down/Left/Right drill, Up flies. 1-5 use items, Esc for the menu."
 
     def _draw_world(self, surf):

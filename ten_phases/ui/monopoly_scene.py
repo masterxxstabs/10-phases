@@ -100,6 +100,9 @@ class Coin:
 
 class MonopolyScene(Scene):
     """Local by default; pass `host` + `session` to host a network game, or `client` to join one."""
+    # Controller: X rolls / goes on (like R or Enter); the pointer does the rest (see gamepad.py).
+    pad_buttons = {"X": pygame.K_r}
+
 
     def __init__(self, app, host=None, session=None, client=None, max_rounds: int | None = None):
         super().__init__(app)
