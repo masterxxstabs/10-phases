@@ -287,6 +287,20 @@ def test_mashing_every_key_never_breaks_the_rules():
         check(g)
 
 
+def test_the_sky_draws_at_every_camera_height(app, tmp_path, monkeypatch):
+    from ten_phases import settings
+    from ten_phases.ui import deepdig_art
+    from ten_phases.ui.deepdig_scene import DeepDigScene
+    monkeypatch.setattr(settings, "SETTINGS_PATH", tmp_path / "s.json")
+    scene = DeepDigScene(app, DeepDig(seed=2))
+    scene.splash = None
+    before = len(deepdig_art._cache)
+    for cam_y in range(-9 * 40, 41, 7):                 # just above ground used to crash the clouds
+        scene.cam = [0.0, float(cam_y)]
+        scene._draw_world(app.screen)
+    assert len(deepdig_art._cache) <= before + 120      # one sky, not one per camera height
+
+
 def test_the_screen_plays(app, tmp_path, monkeypatch):
     from ten_phases import settings
     from ten_phases.ui.deepdig_scene import DeepDigScene

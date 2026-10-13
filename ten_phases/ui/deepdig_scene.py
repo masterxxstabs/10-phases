@@ -428,8 +428,9 @@ class DeepDigScene(Scene):
         cam_x, cam_y = self.cam
         # Sky and the town, when they're in view.
         if cam_y < 0:
-            sky = art.sky(VIEW.w, int(-cam_y) + 4)
-            surf.blit(sky, (VIEW.x, VIEW.y))
+            h = int(-cam_y) + 4
+            sky = art.sky(VIEW.w, max(h, VIEW.h))            # one picture, showing its bottom h pixels
+            surf.blit(sky, (VIEW.x, VIEW.y), (0, sky.get_height() - h, VIEW.w, h))
             for name, (a, b) in BUILDINGS.items():
                 width = (b - a + 1) * TILE
                 img = art.building(name, width)

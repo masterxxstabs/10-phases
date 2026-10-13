@@ -214,11 +214,12 @@ def sky(width: int, height: int) -> pygame.Surface:
     for y in range(0, height, 2):
         k = y / max(1, height)
         pygame.draw.rect(s, [int(top[i] + (bottom[i] - top[i]) * k) for i in range(3)], (0, y, width, 2))
-    pygame.draw.circle(s, (255, 240, 170), (width - 160, 90), 46)
-    pygame.draw.circle(s, (255, 250, 210), (width - 160, 90), 36)
+    sun = max(70, height - 290)                        # the bottom of the sky is what's usually in view
+    pygame.draw.circle(s, (255, 240, 170), (width - 160, sun), 46)
+    pygame.draw.circle(s, (255, 250, 210), (width - 160, sun), 36)
     rng = random.Random(3)
     for _ in range(6):
-        x, y = rng.randrange(width), rng.randrange(40, height - 120)
+        x, y = rng.randrange(width), rng.randrange(max(40, height - 330), max(41, height - 120))
         for k in range(4):
             pygame.draw.circle(s, (250, 252, 255), (x + k * 22, y + (k % 2) * 6), 20 + (k % 2) * 6)
     # Hills on the horizon.
